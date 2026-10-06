@@ -1,0 +1,140 @@
+/* 임시 스타일 — 색은 design/today-wireframe.md 5-2 임시안. 브랜드 가이드 확정 후 교체 */
+:root {
+  --bg: #fffbf5;
+  --text: #2b2420;
+  --sub: #5c5047;
+  --primary: #a0471d;
+  --done: #2e6b4f;
+  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--text);
+  background: var(--bg);
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; }
+h1 { font-size: 1.4rem; margin: 0 0 0.5rem; }
+h2 { font-size: 1.1rem; margin: 0; }
+.page { max-width: 480px; margin: 0 auto; padding: 1.5rem 1rem calc(1.5rem + env(safe-area-inset-bottom)); }
+.center { text-align: center; }
+.lead { color: var(--sub); margin-top: 0; }
+.card { background: #fff; border: 1px solid #e8dfd4; border-radius: 12px; padding: 1rem; margin: 1rem 0; display: flex; flex-direction: column; gap: 0.75rem; }
+.card p { margin: 0; }
+label { font-weight: 600; }
+input { font-size: 1rem; min-height: 3rem; padding: 0 0.75rem; border: 2px solid var(--sub); border-radius: 8px; }
+button { font-size: 1rem; min-height: 3.5rem; border-radius: 8px; cursor: pointer; }
+.btn-primary { background: var(--primary); color: #fff; border: none; font-weight: 700; }
+.btn-primary:disabled { opacity: 0.6; }
+.btn-secondary { background: #fff; color: var(--text); border: 2px solid var(--sub); }
+.btn-link { background: none; border: none; color: var(--sub); text-decoration: underline; min-height: 3rem; }
+.muted { color: var(--sub); }
+.small { font-size: 0.85rem; }
+.notice { font-size: 0.85rem; color: var(--sub); }
+/* 오류 안내도 빨강을 쓰지 않는다(와이어프레임 5-2). 글자 + 테두리로 구분 */
+.field-error, .field-hint { color: var(--text); font-size: 0.9rem; font-weight: 600; }
+input[aria-invalid="true"] { border-width: 3px; border-color: var(--text); }
+.error { background: #f4ece4; padding: 0.5rem; border-radius: 6px; }
+.disclaimer { font-size: 0.8rem; color: var(--sub); margin-top: 2rem; }
+.steps li { margin-bottom: 0.5rem; }
+code { background: #f4ece4; padding: 0 0.25rem; border-radius: 4px; font-size: 0.9em; }
+.topbar { display: flex; justify-content: space-between; align-items: center; padding: 0.5rem 1rem; max-width: 480px; margin: 0 auto; }
+.topbar h1 { margin: 0; }
+
+/* ---------- 공통 보강 ---------- */
+select, textarea { font: inherit; font-size: 1rem; border: 2px solid var(--sub); border-radius: 8px; background: #fff; color: var(--text); }
+select { min-height: 3rem; padding: 0 0.5rem; }
+textarea { width: 100%; padding: 0.75rem; resize: vertical; }
+input { font: inherit; color: var(--text); background: #fff; }
+.error { border: 2px solid var(--sub); color: var(--text); display: flex; flex-direction: column; gap: 0.5rem; }
+.error::before { content: 'ⓘ 안내'; font-weight: 700; font-size: 0.85rem; }
+.ok { background: #e7f0eb; color: var(--text); padding: 0.5rem; border-radius: 6px; border: 2px solid var(--done); }
+.ok::before { content: '✓ '; }
+.block { display: flex; width: 100%; justify-content: center; align-items: center; margin: 0.75rem 0; }
+.link-button { min-height: 3.5rem; border-radius: 8px; text-decoration: none; display: flex; align-items: center; justify-content: center; font-weight: 700; padding: 0 1rem; }
+.btn-secondary.link-button { font-weight: 600; color: var(--text); }
+.row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.row-between { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.strong { font-weight: 700; }
+.step { color: var(--sub); font-weight: 700; min-height: 3rem; display: flex; align-items: center; }
+.label { font-weight: 600; }
+fieldset.plain { border: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+fieldset.plain legend { font-weight: 600; margin-bottom: 0.5rem; padding: 0; }
+.align-end { align-self: flex-end; text-align: right; }
+:focus-visible { outline: 3px solid var(--primary); outline-offset: 2px; }
+
+/* 선택 버튼: 기본(선택 안 됨) / 제안값(점선 + "최근 평균") / 확정(채움 + ✓) */
+.choice-row, .levels { display: flex; gap: 0.5rem; }
+.choice { flex: 1 1 0; min-height: 3.5rem; background: #fff; color: var(--text); border: 2px solid #b8aa9c; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.2; padding: 0.25rem; }
+.choice.is-suggested, input.is-suggested { border: 2px dashed var(--sub); background: #fffbf5; }
+.choice.is-confirmed, .tag.is-confirmed { background: var(--text); color: #fff; border: 3px solid var(--text); }
+.tag-suggested { font-size: 0.8rem; color: var(--sub); font-weight: 600; }
+/* 글자 크기를 크게 키운 기기: 3단 버튼을 세로로 쌓는다 */
+@media (max-width: 300px) { .levels { flex-direction: column; } }
+
+/* 사진 */
+.avatar { border-radius: 50%; object-fit: cover; flex: none; display: inline-flex; align-items: center; justify-content: center; }
+.avatar-empty { background: #f4ece4; font-size: 1.3rem; border: 1px solid #e8dfd4; }
+.photo-picker { display: flex; flex-direction: column; gap: 0.5rem; }
+.photo-row { display: flex; gap: 1rem; align-items: center; }
+.photo-actions { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; }
+.photo-actions .btn-secondary { padding: 0 1rem; }
+
+/* 약 관리 */
+.med-list { list-style: none; padding: 0; margin: 0; }
+.med-name { font-weight: 700; }
+.med-list .row button { padding: 0 1rem; }
+input[type='time'] { min-height: 3rem; font-size: 1.1rem; }
+
+/* ---------- 오늘 화면 ---------- */
+.today { padding-bottom: calc(9rem + env(safe-area-inset-bottom)); }
+.today-header { max-width: 480px; margin: 0 auto; padding: 0.5rem 1rem 0.25rem; border-bottom: 1px solid #e8dfd4; }
+.today-date { font-size: 1.1rem; font-weight: 700; margin: 0; }
+.menu-link { display: inline-flex; align-items: center; min-width: 3rem; justify-content: flex-end; }
+.pet-line { display: flex; align-items: center; gap: 0.5rem; min-height: 3rem; }
+.today-main { padding-top: 0.5rem; }
+.today-main h2 { font-size: 1.1rem; font-weight: 700; }
+.section { padding: 0.75rem 0; border-bottom: 1px solid #e8dfd4; display: flex; flex-direction: column; gap: 0.5rem; }
+.section p { margin: 0; }
+.count { color: var(--sub); font-weight: 600; }
+.welcome { text-align: center; padding: 1rem 0 0.5rem; }
+.welcome-title { font-size: 1.1rem; font-weight: 700; }
+.med-empty { margin: 0.25rem 0; }
+
+/* 투약 카드: 카드 전체가 탭 영역. 체크 상태는 색 + ✓ 아이콘 + "먹임" 글자로 함께 표시 */
+.dose-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.dose { display: flex; align-items: center; gap: 0.75rem; border-radius: 12px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
+.dose[aria-disabled='true'] { cursor: progress; }
+.dose-card { min-height: 4rem; padding: 0.5rem 0.75rem; background: #fff; border: 2px solid #b8aa9c; }
+.dose-card.is-taken { border-color: var(--done); background: #eef5f1; }
+.dose-collapsed { min-height: 3rem; padding: 0.25rem 0.75rem; background: #eef5f1; border: 1px solid var(--done); font-size: 0.95rem; }
+.check { width: 1.75rem; height: 1.75rem; flex: none; border: 2px solid var(--sub); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; background: #fff; }
+.check.is-on { background: var(--done); border-color: var(--done); color: #fff; }
+.dose-body { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.dose-time { color: var(--sub); font-size: 0.9rem; }
+.dose-name { font-weight: 700; overflow-wrap: anywhere; }
+.dose-line { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.dose-action { flex: none; font-weight: 700; border: 2px solid var(--sub); border-radius: 8px; padding: 0.25rem 0.6rem; background: #fff; font-size: 0.95rem; }
+.dose-card.is-taken .dose-action { border-color: var(--done); color: var(--done); }
+.dose-collapsed .dose-action { border-width: 1px; }
+.all-done { font-weight: 700; color: var(--done); }
+.below-doses.shifting { pointer-events: none; }
+
+/* 증상 태그 */
+.tags { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.tag { min-height: 3rem; padding: 0 1rem; background: #fff; color: var(--text); border: 2px solid #b8aa9c; font-weight: 600; border-radius: 999px; }
+.tag-none { align-self: flex-start; }
+
+/* 체중·ml 입력 */
+.unit-input { display: flex; align-items: center; gap: 0.5rem; }
+.unit-input input { width: 7rem; text-align: center; font-size: 1.2rem; font-weight: 700; }
+input.is-measured { border: 3px solid var(--text); }
+.stepper { display: flex; align-items: center; justify-content: center; gap: 0.75rem; }
+.stepper > button { width: 3.5rem; font-size: 1.5rem; background: #fff; border: 2px solid var(--sub); color: var(--text); }
+.stepper > button:disabled, .measured-btn:disabled { opacity: 0.5; }
+.measured-btn { flex: none; width: 100%; }
+
+/* 하단 고정 저장 영역 */
+.save-bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid #e8dfd4; padding: 0.5rem 1rem calc(0.75rem + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 0.5rem; max-width: 480px; margin: 0 auto; }
+.save-btn { width: 100%; min-height: 3.5rem; font-size: 1.1rem; }
+.toast-slot:empty { display: none; }
+.toast { margin: 0; background: var(--text); color: #fff; padding: 0.75rem 1rem; border-radius: 10px; font-weight: 600; }
