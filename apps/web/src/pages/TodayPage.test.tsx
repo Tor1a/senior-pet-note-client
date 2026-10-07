@@ -105,9 +105,9 @@ function mockServer(routes: Record<string, Handler>) {
   return calls;
 }
 
-function renderToday(reload = vi.fn(async () => {})) {
+function renderToday(reload = vi.fn(async () => {}), path = '/today') {
   render(
-    <MemoryRouter initialEntries={['/today']}>
+    <MemoryRouter initialEntries={[path]}>
       <PetContext.Provider value={{ status: 'ready', pet: PET, reload, setPet: vi.fn() }}>
         <TodayPage />
       </PetContext.Provider>
@@ -415,5 +415,28 @@ describe('오늘 화면 — 오류 처리', () => {
     await new Promise((r) => setTimeout(r, 50));
     expect(onUnauthorized).not.toHaveBeenCalled();
     window.removeEventListener('spn:unauthorized', onUnauthorized);
+  });
+});
+
+describe('오늘 화면 — 푸시로 열었을 때(S9)', () => {
+  it('?source=push&med=<id> 면 아직 안 먹인 해당 약 카드를 강조한다', async () => {
+    mockServer({ 'GET /api/pets/pet-1/today': () => json(200, todayExample()) });
+    renderToday(undefined, '/today?source=push&med=uuid');
+    expect(await screen.findByText('방금 알림 온 약')).toBeTruthy();
+    expect(doseBox(/20:00|오후 8:00/).className).toContain('is-highlight');
+  });
+
+  it('없는 약 id 면 강조 없이 그대로 연다', async () => {
+    mockServer({ 'GET /api/pets/pet-1/today': () => json(200, todayExample()) });
+    renderToday(undefined, '/today?source=push&med=none');
+    await screen.findByText('10월 6일 (화)');
+    expect(screen.queryByText('방금 알림 온 약')).toBeNull();
+  });
+
+  it('source=push 가 아니면 med 가 있어도 강조하지 않는다', async () => {
+    mockServer({ 'GET /api/pets/pet-1/today': () => json(200, todayExample()) });
+    renderToday(undefined, '/today?med=uuid');
+    await screen.findByText('10월 6일 (화)');
+    expect(screen.queryByText('방금 알림 온 약')).toBeNull();
   });
 });

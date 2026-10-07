@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import PetAvatar from '../components/PetAvatar';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
@@ -34,6 +34,7 @@ import {
   type TodayForm,
 } from '../lib/todayForm';
 import { usePet } from '../pet';
+import { usePushMessages } from '../push/PushProvider';
 
 // "오늘" 기록 화면 (design/today-wireframe.md 2장, 계약 docs/api-today.md)
 // - 기록 날짜·제안값·새벽 4시 안내 문구는 서버(GET /today)가 준 값을 그대로 쓴다.
@@ -44,6 +45,8 @@ export const COLLAPSE_DELAY_MS = 300;
 /** 접힌 뒤 아래 영역 입력을 조금 더 막아 잘못 탭하는 일을 줄인다 */
 const SHIFT_GUARD_EXTRA_MS = 150;
 const TOAST_MS = 3000;
+/** 알림으로 열었을 때 "방금 알림 온 약" 강조를 유지하는 시간 (설계서 9-4) */
+export const HIGHLIGHT_MS = 2 * 60 * 1000;
 const WATER_MODE_KEY = 'spn.waterMode';
 
 interface DoseView extends Dose {
@@ -151,6 +154,26 @@ export default function TodayPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 화면을 보고 있을 때 투약 알림이 오면(배너는 PushProvider 가 그린다) 투약 상태를 서버와 다시 맞춘다
+  usePushMessages(() => {
+    void syncDoses();
+  });
+
+  // 알림 탭(?source=push&med=<medicationId>): 해당 약의 아직 안 먹인 회차 카드를 2분간 강조한다(없는 id 면 무시)
+  const medParam = params.get('source') === 'push' ? params.get('med') : null;
+  const [highlightExpired, setHighlightExpired] = useState(false);
+  useEffect(() => {
+    setHighlightExpired(false);
+    if (!medParam) return;
+    const t = window.setTimeout(() => setHighlightExpired(true), HIGHLIGHT_MS);
+    return () => window.clearTimeout(t);
+  }, [medParam]);
+  const highlightKey = useMemo(() => {
+    if (!medParam || highlightExpired) return null;
+    const d = doses.find((x) => x.medicationId === medParam && !x.taken);
+    return d ? doseKey(d) : null;
+  }, [medParam, highlightExpired, doses]);
 
   // today_opened: 화면을 열 때 한 번. 실패해도 화면에는 영향 없음
   useEffect(() => {
@@ -369,7 +392,7 @@ export default function TodayPage() {
                   <ul className="dose-list">
                     {doses.map((d) => (
                       <li key={doseKey(d)}>
-                        <DoseItem dose={d} onToggle={() => void toggleDose(d)} />
+                        <DoseItem dose={d} highlight={doseKey(d) === highlightKey} onToggle={() => void toggleDose(d)} />
                       </li>
                     ))}
                   </ul>
@@ -600,7 +623,14 @@ function daysAgoText(days: number): string {
   return `${days}일 전`;
 }
 
-function DoseItem({ dose, onToggle }: { dose: DoseView; onToggle: () => void }) {
+function DoseItem({ dose, highlight, onToggle }: { dose: DoseView; highlight: boolean; onToggle: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!highlight || !ref.current) return;
+    ref.current.scrollIntoView?.({ block: 'center' });
+    ref.current.focus({ preventScroll: true });
+  }, [highlight]);
+
   const what = [dose.name, dose.doseText].filter(Boolean).join(' ');
   const time = formatTime(dose.scheduledTime);
   const takenText = dose.taken && dose.takenAt ? `${formatTakenAt(dose.takenAt)} 먹임` : '먹임';
@@ -637,13 +667,16 @@ function DoseItem({ dose, onToggle }: { dose: DoseView; onToggle: () => void }) 
   }
 
   return (
-    <div
+    <>
+      {highlight && <p className="dose-flag">방금 알림 온 약</p>}
+      <div
+        ref={ref}
       role="checkbox"
       aria-checked={dose.taken}
       aria-label={label}
       aria-disabled={dose.pending || undefined}
       tabIndex={0}
-      className={`dose dose-card ${dose.taken ? 'is-taken' : ''}`}
+      className={`dose dose-card ${dose.taken ? 'is-taken' : ''} ${highlight ? 'is-highlight' : ''}`}
       onClick={onToggle}
       onKeyDown={(e) => {
         if (e.key === ' ' || e.key === 'Enter') {
@@ -661,6 +694,7 @@ function DoseItem({ dose, onToggle }: { dose: DoseView; onToggle: () => void }) 
       </span>
       <span className="dose-action">{dose.taken ? takenText : '먹였어요'}</span>
     </div>
+    </>
   );
 }
 

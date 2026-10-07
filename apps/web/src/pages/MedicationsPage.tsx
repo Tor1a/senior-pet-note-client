@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { ApiError, toUserMessage } from '../lib/api';
-import { petApi } from '../lib/client';
+import { petApi, reminderApi } from '../lib/client';
 import { DISCLAIMER } from '../lib/constants';
 import { formatTime } from '../lib/format';
 import type { Medication, MedicationInput } from '../lib/petApi';
+import type { Reminder } from '../lib/reminderApi';
+import { reminderStatus } from '../lib/reminderForm';
+import { cannotReceive, usePush } from '../push/PushProvider';
 import { usePet } from '../pet';
 
-// 약 관리 (/medications, 온보딩 2/2 이면 ?onboarding=1)
+// 약 관리 (/medications, 온보딩 2/2 이면 ?onboarding=1, ?edit=<약 id> 면 그 약 고치기 폼을 연 상태)
 // 이름(필수), 용량(선택), 하루 시각 1~3개(서로 달라야 함)
+// 약 카드마다 알림 상태 줄 + [알림 설정] (화면 설계 3장). 목록 API 에 알림 정보가 없어 약마다 GET reminder 를 병렬로 부른다.
 const NAME_MAX = 50;
 const DOSE_MAX = 50;
 const MAX_TIMES = 3;
@@ -34,8 +38,11 @@ export function validateMedicationDraft(d: Draft): string | null {
 
 export default function MedicationsPage() {
   const { pet, reload } = usePet();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const onboarding = params.get('onboarding') === '1';
+  const editId = params.get('edit');
+  const location = useLocation();
+  const push = usePush();
 
   const [meds, setMeds] = useState<Medication[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -43,7 +50,14 @@ export default function MedicationsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  // 알림 설정 화면에서 "목록에서 뺀 약"으로 돌아온 경우 그 안내를 보여 준다
+  const [notice, setNotice] = useState<string | null>(
+    () => (location.state as { notice?: string } | null)?.notice ?? null,
+  );
+  /** 방금 등록한 약 id (등록 직후 "알림 설정하기" 진입점) */
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  /** 약별 알림 설정. 'error' 면 상태 줄을 숨긴다 */
+  const [reminders, setReminders] = useState<Record<string, Reminder | 'error'>>({});
 
   const handleError = useCallback(
     (err: unknown, set: (m: string) => void) => {
@@ -61,8 +75,17 @@ export default function MedicationsPage() {
     if (!pet) return;
     setLoadError(null);
     try {
-      const list = await petApi.listMedications(pet.id);
-      setMeds(list ?? []);
+      const list = (await petApi.listMedications(pet.id)) ?? [];
+      setMeds(list);
+      // 하나가 실패해도 다른 카드는 표시한다
+      void Promise.all(
+        list.map((m) =>
+          reminderApi.getReminder(m.id).then(
+            (r): [string, Reminder | 'error'] => [m.id, r],
+            (): [string, Reminder | 'error'] => [m.id, 'error'],
+          ),
+        ),
+      ).then((entries) => setReminders(Object.fromEntries(entries)));
     } catch (err) {
       handleError(err, setLoadError);
     }
@@ -71,6 +94,16 @@ export default function MedicationsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // ?edit=<id>: 알림 설정 화면의 "먹이는 시각 바꾸기"에서 왔다 → 그 약 고치기 폼을 연다(한 번만)
+  useEffect(() => {
+    if (!meds || !editId) return;
+    const m = meds.find((x) => x.id === editId);
+    if (m) setDraft({ id: m.id, name: m.name, doseText: m.doseText ?? '', times: [...m.times] });
+    const next = new URLSearchParams(params);
+    next.delete('edit');
+    setParams(next, { replace: true });
+  }, [meds, editId]);
 
   // 약이 하나도 없으면 바로 입력 폼을 연다
   useEffect(() => {
@@ -90,8 +123,13 @@ export default function MedicationsPage() {
     };
     setBusy(true);
     try {
-      if (draft.id) await petApi.updateMedication(draft.id, input);
-      else await petApi.createMedication(pet.id, input);
+      if (draft.id) {
+        await petApi.updateMedication(draft.id, input);
+        setCreatedId(null);
+      } else {
+        const created = await petApi.createMedication(pet.id, input);
+        setCreatedId(created?.id ?? null);
+      }
       setNotice(draft.id ? `${input.name} 정보를 고쳤어요.` : `${input.name}을(를) 등록했어요.`);
       setDraft(null);
       await load();
@@ -108,6 +146,7 @@ export default function MedicationsPage() {
     try {
       await petApi.deleteMedication(med.id);
       setConfirmDeleteId(null);
+      setCreatedId(null);
       setNotice(`${med.name}을(를) 목록에서 뺐어요. 지난 기록은 그대로 남아요.`);
       await load();
     } catch (err) {
@@ -139,9 +178,17 @@ export default function MedicationsPage() {
           </p>
         )}
         {notice && (
-          <p role="status" className="ok">
-            {notice}
-          </p>
+          <div role="status" className="ok">
+            <p>{notice}</p>
+            {createdId && (
+              <>
+                <p>먹일 시간에 알림을 받아 볼까요?</p>
+                <Link to={`/medications/${encodeURIComponent(createdId)}/reminder`} className="btn-secondary link-button">
+                  알림 설정하기 ›
+                </Link>
+              </>
+            )}
+          </div>
         )}
         {meds === null && !loadError && <p aria-busy="true">불러오는 중…</p>}
 
@@ -154,6 +201,11 @@ export default function MedicationsPage() {
                   {m.doseText && <span className="muted"> · {m.doseText}</span>}
                 </p>
                 <p className="muted">{m.times.map(formatTime).join(' · ')}</p>
+                <ReminderStatusLine
+                  med={m}
+                  reminder={reminders[m.id]}
+                  deviceCannotReceive={cannotReceive(push.state)}
+                />
                 {confirmDeleteId === m.id ? (
                   <div className="row">
                     <span>목록에서 뺄까요? 지난 기록은 남아요.</span>
@@ -165,21 +217,30 @@ export default function MedicationsPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="row">
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => {
-                        setFormError(null);
-                        setDraft({ id: m.id, name: m.name, doseText: m.doseText ?? '', times: [...m.times] });
-                      }}
-                    >
-                      고치기
-                    </button>
-                    <button type="button" className="btn-link" onClick={() => setConfirmDeleteId(m.id)}>
+                  <>
+                    <div className="row">
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => {
+                          setFormError(null);
+                          setDraft({ id: m.id, name: m.name, doseText: m.doseText ?? '', times: [...m.times] });
+                        }}
+                      >
+                        고치기
+                      </button>
+                      <Link
+                        to={`/medications/${encodeURIComponent(m.id)}/reminder`}
+                        className="btn-secondary link-button"
+                      >
+                        알림 설정
+                      </Link>
+                    </div>
+                    {/* 지우는 동작이라 다음 줄 링크로 내려 실수 탭을 줄인다(화면 설계 3-1) */}
+                    <button type="button" className="btn-link align-start" onClick={() => setConfirmDeleteId(m.id)}>
                       목록에서 빼기
                     </button>
-                  </div>
+                  </>
                 )}
               </li>
             ))}
@@ -207,6 +268,7 @@ export default function MedicationsPage() {
             />
             <fieldset className="plain">
               <legend>하루에 먹이는 시각 (1~3개)</legend>
+              {draft.id && <p className="notice">시각을 바꾸면 알림 시각도 같이 바뀌어요.</p>}
               {draft.times.map((t, i) => (
                 <div className="row" key={i}>
                   <input
@@ -270,5 +332,49 @@ export default function MedicationsPage() {
         <p className="disclaimer">{DISCLAIMER}</p>
       </main>
     </div>
+  );
+}
+
+/** 약 카드의 알림 상태 줄 (화면 설계 3-2). 누르면 알림 설정으로 간다 */
+function ReminderStatusLine({
+  med,
+  reminder,
+  deviceCannotReceive,
+}: {
+  med: Medication;
+  reminder: Reminder | 'error' | undefined;
+  deviceCannotReceive: boolean;
+}) {
+  if (reminder === 'error') return null; // 불러오기 실패: 숨김([알림 설정] 버튼은 그대로)
+  if (!reminder) {
+    return (
+      <p className="muted reminder-line" aria-busy="true">
+        알림 확인 중…
+      </p>
+    );
+  }
+  const status = reminderStatus(reminder);
+  const showDeviceLine = status.kind === 'on' && deviceCannotReceive;
+  const times = med.times.map(formatTime).join('와 ');
+  const label = [
+    `${med.name} ${status.text.replace(/ · /g, ', ')}`,
+    status.kind === 'on' ? times : '',
+    showDeviceLine ? '이 기기에서는 받을 수 없어요' : '',
+    '누르면 알림 설정으로 가요',
+  ]
+    .filter(Boolean)
+    .join('. ');
+  return (
+    <Link
+      to={`/medications/${encodeURIComponent(med.id)}/reminder`}
+      className={`reminder-line is-${status.kind}`}
+      aria-label={label}
+    >
+      <span>
+        <span aria-hidden="true">{status.kind === 'off' ? '🔕 ' : '🔔 '}</span>
+        {status.text}
+      </span>
+      {showDeviceLine && <span className="field-hint">이 기기에서는 받을 수 없어요 ›</span>}
+    </Link>
   );
 }

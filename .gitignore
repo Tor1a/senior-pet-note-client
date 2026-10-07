@@ -4,3 +4,7 @@ node_modules/
 
 # 회사 문서(로컬 전용)
 .company/
+
+# Firebase 설정 파일(google-services.json, GoogleService-Info.plist)은 git 에 올리지 않는다
+google-services.json
+GoogleService-Info.plist

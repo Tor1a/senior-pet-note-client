@@ -32,6 +32,50 @@ export function formatTakenAt(iso: string): string {
   return `${hour}:${minute}`;
 }
 
+/** 'YYYY-MM-DD' → '10월 31일' (요일 없이) */
+export function formatMonthDay(date: string): string {
+  const [, m, d] = date.split('-').map(Number);
+  return `${m}월 ${d}일`;
+}
+
+/**
+ * ISO 시각(UTC) → 한국 시각 '10월 8일 (수) 오전 8:00'.
+ * 서버가 계산한 nextFireAt 을 보여 주기만 한다(계산 아님). 잘못된 값이면 빈 문자열.
+ */
+export function formatSeoulDateTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '00';
+  return `${formatRecordDate(`${get('year')}-${get('month')}-${get('day')}`)} ${formatTime(`${get('hour')}:${get('minute')}`)}`;
+}
+
+/** 지금 한국 날짜 'YYYY-MM-DD' (입력 칸 상한 등 표시용. 기록 날짜 계산에 쓰지 않는다) */
+export function seoulDateString(now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(now);
+  const get = (type: string) => parts.find((p) => p.type === type)?.value ?? '01';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+
+/** 'YYYY-MM-DD' 에 일수를 더한 날짜 (달력 계산, 시간대 무관) */
+export function addDays(date: string, days: number): string {
+  const [y, m, d] = date.split('-').map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
+
 /** 두 'YYYY-MM-DD' 사이 일수 (to - from) */
 export function daysBetween(from: string, to: string): number {
   const toUtc = (s: string) => {

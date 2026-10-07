@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError, type User } from './lib/api';
 import { api, UNAUTHORIZED_EVENT } from './lib/client';
 import { clearToken, getToken, setToken } from './lib/tokenStorage';
+import { releaseWebDevice } from './push/device';
 
 // 로그인 상태를 앱 전체에 공유한다.
 //   loading   : 앱 시작 시 /api/me 로 세션 확인 중
@@ -16,7 +17,8 @@ interface AuthContextValue {
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  /** 이 기기 알림 해제(최대 3초)를 기다린 뒤 로그아웃한다 */
+  logout: () => Promise<void>;
   /** 서버 연결 실패 후 다시 세션 확인 */
   retry: () => void;
 }
@@ -60,6 +62,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // 어떤 요청이든 401 을 받으면 로그아웃 후 /login 으로
   useEffect(() => {
     const onUnauthorized = () => {
+      // 토큰이 이미 무효라 서버 기기 해제(DELETE)는 못 한다 → Firebase 토큰과 로컬 기기 id 만 정리
+      // (서버의 "같은 토큰 재등록 시 현재 계정으로 이전" 규칙이 다음 로그인 때 정리한다)
+      void releaseWebDevice(false);
       setUser(null);
       setStatus('signedOut');
       navigate('/login', { replace: true });
@@ -84,8 +89,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(res.user);
         setStatus('signedIn');
       },
-      logout: () => {
-        // refresh 토큰이 없으므로 서버 호출 없이 토큰만 지운다
+      logout: async () => {
+        // 서버에 로그아웃 API 는 없다(refresh 토큰 없음). 다만 이 기기 알림은 로그인 토큰을 지우기 "전에"
+        // 해제해야 한다(DELETE /api/devices/{id}, 최대 3초, 실패해도 로그아웃은 진행).
+        await releaseWebDevice(true);
         clearToken();
         setUser(null);
         setStatus('signedOut');

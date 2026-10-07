@@ -7,16 +7,20 @@ import LoginPage from './pages/LoginPage';
 import TodayPage from './pages/TodayPage';
 import PetFormPage from './pages/PetFormPage';
 import MedicationsPage from './pages/MedicationsPage';
+import ReminderPage from './pages/ReminderPage';
+import { PushProvider } from './push/PushProvider';
 import SetupNeededPage from './pages/SetupNeededPage';
 import ServerDownPage from './pages/ServerDownPage';
 
 // 라우팅
 //   /login       : 로그인·회원가입 (이미 로그인돼 있으면 /today 로)
 //   /pets/new    : 반려동물 등록 (온보딩 1/2). 이미 있으면 /today 로
-//   /medications : 약 관리 (온보딩 2/2 이면 ?onboarding=1)
+//   /medications : 약 관리 (온보딩 2/2 이면 ?onboarding=1, 약 고치기 폼 바로 열기 ?edit=<약 id>)
+//   /medications/:id/reminder : 투약 알림 설정
 //   /pet         : 프로필 수정(사진 교체·삭제, 로그아웃)
-//   /today       : "오늘" 기록 화면
+//   /today       : "오늘" 기록 화면 (알림을 눌러 열면 ?source=push)
 //   로그인 안 됨 → /login, 반려동물 없음 → /pets/new
+//   로그인한 화면은 PushProvider 안에 있다(이 기기 알림 상태, 기기 등록, 포그라운드 배너)
 export default function App() {
   // API 주소 환경변수가 잘못되면 앱이 죽지 않고 안내 화면만 보여 준다
   if (!apiConfig.ok) return <SetupNeededPage message={apiConfig.message} />;
@@ -34,9 +38,11 @@ export default function App() {
       <Route
         element={
           <RequireAuth>
-            <PetProvider>
-              <Outlet />
-            </PetProvider>
+            <PushProvider>
+              <PetProvider>
+                <Outlet />
+              </PetProvider>
+            </PushProvider>
           </RequireAuth>
         }
       >
@@ -61,6 +67,14 @@ export default function App() {
           element={
             <PetGate need="ready">
               <MedicationsPage />
+            </PetGate>
+          }
+        />
+        <Route
+          path="/medications/:id/reminder"
+          element={
+            <PetGate need="ready">
+              <ReminderPage />
             </PetGate>
           }
         />

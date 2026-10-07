@@ -20,6 +20,7 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
   // 등록 화면을 열 때 이미 반려동물이 있으면 오늘 화면으로 (등록 직후 이동과 겹치지 않게 처음 값만 본다)
   const [alreadyHasPet] = useState(mode === 'new' && status === 'ready');
   const { logout } = useAuth();
+  const [loggingOut, setLoggingOut] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const isNew = mode === 'new';
@@ -167,9 +168,23 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
       <header className="topbar">
         {isNew ? <span className="step">1 / 2</span> : <Link to="/today" className="btn-link">← 오늘로</Link>}
         {!isNew && (
-          <button type="button" className="btn-link" onClick={logout}>
-            로그아웃
-          </button>
+          <div className="logout-box">
+            <button
+              type="button"
+              className="btn-link"
+              onClick={() => {
+                setLoggingOut(true);
+                void logout();
+              }}
+              disabled={loggingOut}
+              aria-describedby="logout-note"
+            >
+              {loggingOut ? '로그아웃하는 중…' : '로그아웃'}
+            </button>
+            <p id="logout-note" className="notice">
+              로그아웃하면 이 기기로 오던 투약 알림도 멈춰요.
+            </p>
+          </div>
         )}
       </header>
       <main className="page">

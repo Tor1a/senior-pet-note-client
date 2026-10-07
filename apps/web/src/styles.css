@@ -105,6 +105,8 @@ input[type='time'] { min-height: 3rem; font-size: 1.1rem; }
 .dose { display: flex; align-items: center; gap: 0.75rem; border-radius: 12px; cursor: pointer; user-select: none; -webkit-tap-highlight-color: transparent; }
 .dose[aria-disabled='true'] { cursor: progress; }
 .dose-card { min-height: 4rem; padding: 0.5rem 0.75rem; background: #fff; border: 2px solid #b8aa9c; }
+.dose-card.is-highlight { border: 3px solid var(--primary); }
+.dose-flag { margin: 0 0 0.25rem; font-size: 0.875rem; font-weight: 700; color: var(--primary); }
 .dose-card.is-taken { border-color: var(--done); background: #eef5f1; }
 .dose-collapsed { min-height: 3rem; padding: 0.25rem 0.75rem; background: #eef5f1; border: 1px solid var(--done); font-size: 0.95rem; }
 .check { width: 1.75rem; height: 1.75rem; flex: none; border: 2px solid var(--sub); border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; background: #fff; }
@@ -138,3 +140,48 @@ input.is-measured { border: 3px solid var(--text); }
 .save-btn { width: 100%; min-height: 3.5rem; font-size: 1.1rem; }
 .toast-slot:empty { display: none; }
 .toast { margin: 0; background: var(--text); color: #fff; padding: 0.75rem 1rem; border-radius: 10px; font-weight: 600; }
+
+/* ---------- 투약 알림 (.company/design/투약-알림.md) ---------- */
+/* 켜짐/꺼짐은 색 + 글자 + 아이콘(종 / 줄 그은 종)을 함께 쓴다. 빨강은 쓰지 않는다 */
+.align-start { align-self: flex-start; }
+.med-list .link-button { padding: 0 1rem; }
+.reminder-line { display: flex; flex-direction: column; justify-content: center; gap: 0.15rem; min-height: 3rem; padding: 0.4rem 0.75rem; border-radius: 8px; color: var(--sub); text-decoration: none; }
+.reminder-line.is-on { color: var(--text); font-weight: 700; border: 2px solid var(--done); background: #eef5f1; }
+.reminder-line.is-ended { border: 1px solid var(--sub); }
+.reminder-line .field-hint { font-weight: 700; }
+.logout-box { display: flex; flex-direction: column; align-items: flex-end; max-width: 14rem; text-align: right; }
+.logout-box .notice { margin: 0; }
+
+/* 알림 설정 화면 */
+.reminder-page { padding-bottom: calc(10rem + env(safe-area-inset-bottom)); }
+.reminder-page .section h2 { font-weight: 700; }
+.card.tight { margin: 0; }
+.switch-row { width: 100%; display: flex; justify-content: space-between; align-items: center; min-height: 3.5rem; padding: 0 1rem; background: #fff; color: var(--text); border: 2px solid var(--sub); margin: 0.5rem 0; }
+.switch-state { min-width: 5rem; padding: 0.25rem 0.75rem; border-radius: 999px; border: 2px solid var(--sub); font-weight: 700; background: #fff; color: var(--text); }
+.switch-row.is-on .switch-state { background: var(--done); border-color: var(--done); color: #fff; }
+.radio-rows { display: flex; flex-direction: column; gap: 0.5rem; }
+.radio-row { flex: none; min-height: 3.5rem; flex-direction: row; justify-content: flex-start; padding: 0 1rem; text-align: left; }
+.day-grid { display: grid; grid-template-columns: repeat(4, minmax(3.5rem, 1fr)); gap: 0.5rem; }
+.day-grid .choice { min-height: 3.5rem; }
+.interval-value { min-width: 6rem; text-align: center; font-size: 1.2rem; font-weight: 700; }
+input[type='date'] { min-height: 3rem; font-size: 1.1rem; }
+.summary-box { border: 2px solid var(--sub); border-radius: 12px; padding: 0.75rem 1rem; margin: 1rem 0 0.5rem; background: #fff; display: flex; flex-direction: column; gap: 0.25rem; }
+.summary-box p { margin: 0; }
+.device-card { margin: 0.75rem 0; }
+.device-card p { margin: 0; }
+.device-card ol { margin: 0.25rem 0; padding-left: 1.25rem; }
+.details-summary { min-height: 3rem; display: flex; align-items: center; font-weight: 700; cursor: pointer; text-decoration: underline; }
+.confirm-card { border: 2px solid var(--text); }
+
+/* 알림 허용 사전 안내 대화상자 */
+.dialog-backdrop { position: fixed; inset: 0; background: rgba(43, 36, 32, 0.5); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 20; }
+.dialog { background: #fff; border-radius: 12px; padding: 1.25rem; max-width: 420px; width: 100%; display: flex; flex-direction: column; gap: 0.75rem; }
+.dialog p { margin: 0; }
+.dialog h2 { font-size: 1.1rem; font-weight: 700; }
+.dialog-icon { font-size: 2rem; text-align: center; }
+
+/* 포그라운드 인앱 배너 (자동으로 사라지지 않음) */
+.push-banner { position: sticky; top: 0; z-index: 10; max-width: 480px; margin: 0.5rem auto; background: #fff; border: 2px solid var(--primary); border-radius: 12px; padding: 0.75rem 1rem; box-shadow: 0 2px 8px rgba(43, 36, 32, 0.15); display: flex; flex-direction: column; gap: 0.5rem; }
+.push-banner p { margin: 0; }
+.push-banner-close { min-width: 3rem; min-height: 3rem; }
+.push-banner-list { list-style: none; margin: 0; padding: 0; }
