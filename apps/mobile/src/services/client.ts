@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import { createApiClient } from '../lib/api';
+import { createPetApi } from '../lib/petApi';
 import { createReminderApi } from '../lib/reminderApi';
 import { resolveApiConfig } from './config';
 import { clearToken, getToken } from './tokenStorage';
@@ -34,3 +35,5 @@ export const api = createApiClient({
 });
 
 export const reminderApi = createReminderApi(api);
+
+export const petApi = createPetApi(api);

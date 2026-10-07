@@ -4,7 +4,7 @@
 // - 포그라운드 알림은 시스템이 보여 주지 않으므로 PushProvider 의 앱 안 배너로 처리한다.
 import Constants from 'expo-constants';
 import { PermissionsAndroid, Platform } from 'react-native';
-import { push as disabled } from './push';
+import { push as disabled } from './pushDisabled';
 import { pushUnavailableReason } from './pushAvailability';
 import type { PermissionState, PushMessage, PushPlatform } from './pushTypes';
 

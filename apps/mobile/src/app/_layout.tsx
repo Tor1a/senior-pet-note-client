@@ -8,6 +8,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { AppText } from '../components/ui';
+import { PetProvider } from '../pet/PetProvider';
 import { PushProvider } from '../push/PushProvider';
 import { colors, spacing } from '../theme';
 
@@ -38,8 +39,14 @@ function RootNavigator() {
       </Stack.Protected>
     </Stack>
   );
-  // 알림 기능은 로그인한 동안에만 동작한다
-  return signedIn ? <PushProvider>{navigator}</PushProvider> : navigator;
+  // 알림 기능과 반려동물 상태는 로그인한 동안에만 동작한다(로그아웃하면 함께 사라져 상태가 남지 않는다)
+  return signedIn ? (
+    <PushProvider>
+      <PetProvider>{navigator}</PetProvider>
+    </PushProvider>
+  ) : (
+    navigator
+  );
 }
 
 export default function RootLayout() {
