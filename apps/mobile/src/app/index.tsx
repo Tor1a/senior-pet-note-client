@@ -1,21 +1,18 @@
 // "오늘" 화면 (자리표시)
 // 실제 구성(투약 카드 → 식사·물 → 증상 → 체중·메모)은 design/today-wireframe.md 를 따른다.
-// 지금은 공통 로직(기록 날짜, 안내 문구, 증상 초기 상태)이 웹과 같게 동작하는지만 보여 준다.
+// 지금은 공통 로직(증상 초기 상태)이 웹과 같게 동작하는지만 보여 준다. 기록 날짜는 서버가 계산한다.
 
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { AppButton, AppText, Screen } from '../components/ui';
-import { DISCLAIMER, RECORD_DATE_NOTICE } from '../lib/constants';
-import { toRecordDate } from '../lib/recordDate';
+import { DISCLAIMER } from '../lib/constants';
 import { INITIAL_SYMPTOM_STATE, SYMPTOM_NONE_LABEL } from '../lib/symptoms';
 import { colors, spacing } from '../theme';
 
 export default function TodayScreen() {
   const { user, signOut } = useAuth();
   const [signingOut, setSigningOut] = useState(false);
-  // 화면을 연 시각 기준. 실제 저장은 "체크한 시각"으로 다시 계산한다.
-  const recordDate = toRecordDate(new Date());
 
   async function handleSignOut() {
     setSigningOut(true);
@@ -30,11 +27,6 @@ export default function TodayScreen() {
       <AppText variant="secondary">
         {user ? `${user.email} 님` : '서버에 연결하지 못해 계정 정보를 확인하지 못했어요.'}
       </AppText>
-
-      <View style={styles.card}>
-        <AppText>{`기록 날짜: ${recordDate}`}</AppText>
-        <AppText variant="secondary">{RECORD_DATE_NOTICE}</AppText>
-      </View>
 
       <View style={styles.card}>
         <AppText style={styles.bold}>준비 중이에요</AppText>

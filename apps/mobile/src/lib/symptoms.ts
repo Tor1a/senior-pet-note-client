@@ -1,10 +1,9 @@
-// [공유 로직 사본] 원본: web/src/lib/symptoms.ts (2026-10-06 복사)
+// [공유 로직 사본] 원본: web/src/lib/symptoms.ts (2026-10-07 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
-
 // 증상 선택 상태 (대표 결정 4: "특이사항 없음" 기본 선택)
-// DB 매핑: daily_logs.symptoms(text[]), symptoms_none(boolean), symptom_other(text, 30자)
-// 화면의 상태일 뿐이며, [저장]을 눌러야 symptoms_none = true 로 확정된다.
+// API 필드(camelCase, docs/api-today.md 5장): symptoms[], symptomsNone, symptomOther(30자)
+// 화면의 상태일 뿐이며, [저장]을 눌러야 symptomsNone = true 로 확정된다.
 
 export const SYMPTOM_CODES = ['vomit', 'diarrhea', 'cough', 'lethargy', 'seizure', 'other'] as const;
 export type SymptomCode = (typeof SYMPTOM_CODES)[number];
@@ -54,18 +53,28 @@ export function toggleSymptomNone(state: SymptomState): SymptomState {
   return { none: true, codes: [], other: '' };
 }
 
-/** 저장용 값으로 변환 (DB CHECK 제약: symptoms_none 과 증상 동시 불가) */
-export function toSymptomColumns(state: SymptomState): {
+/** 저장된 기록(서버 값)으로 화면 상태를 만든다 */
+export function symptomStateFromLog(log: {
   symptoms: SymptomCode[];
-  symptoms_none: boolean;
-  symptom_other: string | null;
+  symptomsNone: boolean;
+  symptomOther: string | null;
+}): SymptomState {
+  const codes = log.symptoms.filter((c): c is SymptomCode => (SYMPTOM_CODES as readonly string[]).includes(c));
+  return { none: codes.length === 0 && log.symptomsNone, codes, other: log.symptomOther ?? '' };
+}
+
+/** 저장용 값으로 변환 (서버 검증: symptomsNone 과 증상 동시 불가, 기타 내용은 other 선택 시에만) */
+export function toSymptomFields(state: SymptomState): {
+  symptoms: SymptomCode[];
+  symptomsNone: boolean;
+  symptomOther: string | null;
 } {
   const other = state.codes.includes('other')
     ? state.other.trim().slice(0, SYMPTOM_OTHER_MAX_LENGTH) || null
     : null;
   return {
     symptoms: state.codes,
-    symptoms_none: state.codes.length === 0 && state.none,
-    symptom_other: other,
+    symptomsNone: state.codes.length === 0 && state.none,
+    symptomOther: other,
   };
 }

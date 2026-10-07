@@ -1,111 +1,128 @@
-// API 클라이언트(src/lib/api.ts) 테스트: 가짜 fetch 로 백엔드 인증 계약을 확인한다.
-// 모바일에서 작성한 테스트. packages/shared 통합 때 웹과 함께 쓰도록 옮긴다.
+// [공유 로직 테스트 사본] 원본: web/src/lib/api.test.ts (2026-10-07 복사)
+// vitest import 한 줄 제거, vi.fn → jest.fn 만 바꿈(jest 전역 함수로 실행). 추후 packages/shared 로 통합 예정.
+import { ApiError, createApiClient, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from './api';
 
-import { ApiError, createApiClient, isNetworkError, toUserMessage, type ApiClientOptions } from './api';
-
-const BASE = 'http://10.0.2.2:8080';
-
-/** 정해진 응답을 돌려주고, 받은 요청을 기록하는 가짜 fetch */
-function fakeFetch(status: number, body?: unknown) {
-  const calls: { url: string; init: RequestInit }[] = [];
-  const impl = (async (input: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(input), init: init ?? {} });
-    const text = body === undefined ? '' : typeof body === 'string' ? body : JSON.stringify(body);
-    return {
-      ok: status >= 200 && status < 300,
-      status,
-      text: async () => text,
-    } as Response;
-  }) as typeof fetch;
-  return { impl, calls };
+// fetch 는 가짜(mock)로 바꿔 실제 서버 없이 검사한다
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(body === undefined ? null : JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
-function client(fetchImpl: typeof fetch, extra: Partial<ApiClientOptions> = {}) {
-  return createApiClient({ baseUrl: BASE, getToken: () => null, fetchImpl, ...extra });
+function setup(token: string | null, response: Response | Error) {
+  const fetchImpl = jest.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => {
+    if (response instanceof Error) throw response;
+    return response;
+  });
+  const onUnauthorized = jest.fn();
+  const client = createApiClient({
+    baseUrl: 'http://localhost:8080',
+    getToken: () => token,
+    onUnauthorized,
+    fetchImpl: fetchImpl as unknown as typeof fetch,
+  });
+  const headersOf = (call = 0) => (fetchImpl.mock.calls[call][1]?.headers ?? {}) as Record<string, string>;
+  return { client, fetchImpl, onUnauthorized, headersOf };
 }
 
-describe('인증 계약', () => {
-  it('signup: POST /api/auth/signup 에 JSON 본문을 보내고 201 응답을 돌려준다', async () => {
-    const res = { accessToken: 'jwt-1', user: { id: 1, email: 'a@b.co' } };
-    const { impl, calls } = fakeFetch(201, res);
-    await expect(client(impl).signup('a@b.co', 'password1')).resolves.toEqual(res);
-
-    expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe(`${BASE}/api/auth/signup`);
-    expect(calls[0].init.method).toBe('POST');
-    expect(JSON.parse(String(calls[0].init.body))).toEqual({ email: 'a@b.co', password: 'password1' });
-    const headers = calls[0].init.headers as Record<string, string>;
-    expect(headers['Content-Type']).toBe('application/json');
-    expect(headers.Authorization).toBeUndefined();
+describe('API 클라이언트 — 토큰 헤더', () => {
+  it('토큰이 있으면 Authorization: Bearer 헤더를 붙인다', async () => {
+    const { client, fetchImpl, headersOf } = setup('abc.def.ghi', jsonResponse(200, { id: 1, email: 'a@b.co' }));
+    await expect(client.me()).resolves.toEqual({ id: 1, email: 'a@b.co' });
+    expect(fetchImpl.mock.calls[0][0]).toBe('http://localhost:8080/api/me');
+    expect(headersOf().Authorization).toBe('Bearer abc.def.ghi');
   });
 
-  it('login: POST /api/auth/login 은 200 응답을 돌려준다', async () => {
-    const res = { accessToken: 'jwt-2', user: { id: 'u2', email: 'c@d.co' } };
-    const { impl, calls } = fakeFetch(200, res);
-    await expect(client(impl).login('c@d.co', 'pw')).resolves.toEqual(res);
-    expect(calls[0].url).toBe(`${BASE}/api/auth/login`);
-    expect(calls[0].init.method).toBe('POST');
+  it('토큰이 없으면 Authorization 헤더를 붙이지 않는다', async () => {
+    const { client, headersOf } = setup(null, jsonResponse(200, { accessToken: 't', user: { id: 1, email: 'a@b.co' } }));
+    await client.login('a@b.co', 'password1');
+    expect(headersOf().Authorization).toBeUndefined();
   });
 
-  it('me: GET /api/me 에 Bearer 토큰을 붙인다', async () => {
-    const { impl, calls } = fakeFetch(200, { id: 1, email: 'a@b.co' });
-    await expect(client(impl, { getToken: () => 'tok' }).me()).resolves.toEqual({ id: 1, email: 'a@b.co' });
-    expect(calls[0].url).toBe(`${BASE}/api/me`);
-    expect(calls[0].init.method).toBe('GET');
-    expect((calls[0].init.headers as Record<string, string>).Authorization).toBe('Bearer tok');
+  it('로그인·회원가입은 계약대로 POST + JSON 본문으로 보낸다', async () => {
+    const body = { accessToken: 't', user: { id: 1, email: 'a@b.co' } };
+    const { client, fetchImpl, headersOf } = setup(null, jsonResponse(201, body));
+    await expect(client.signup('a@b.co', 'password1')).resolves.toEqual(body);
+    const [url, init] = fetchImpl.mock.calls[0];
+    expect(url).toBe('http://localhost:8080/api/auth/signup');
+    expect(init?.method).toBe('POST');
+    expect(JSON.parse(String(init?.body))).toEqual({ email: 'a@b.co', password: 'password1' });
+    expect(headersOf()['Content-Type']).toBe('application/json');
   });
 });
 
-describe('오류 처리', () => {
-  it.each([
-    [400, 'VALIDATION_ERROR'],
-    [401, 'UNAUTHORIZED'],
-    [409, 'EMAIL_TAKEN'],
-  ])('%i 응답은 ApiError(http, code=%s)', async (status, code) => {
-    const { impl } = fakeFetch(status, { code, message: 'msg' });
-    const err = await client(impl)
-      .login('a@b.co', 'pw')
-      .catch((e: unknown) => e);
+describe('API 클라이언트 — 401 처리', () => {
+  it('토큰을 붙인 요청이 401 이면 onUnauthorized(로그아웃)를 부른다', async () => {
+    const { client, onUnauthorized } = setup(
+      'expired',
+      jsonResponse(401, { code: 'UNAUTHORIZED', message: 'token expired' }),
+    );
+    const err = await client.me().catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ApiError);
-    expect(err).toMatchObject({ kind: 'http', status, code, message: 'msg' });
-  });
-
-  it('오류 본문이 JSON 이 아니어도 상태 코드로 오류를 만든다', async () => {
-    const { impl } = fakeFetch(500, '<html>Internal Error</html>');
-    await expect(client(impl).me()).rejects.toMatchObject({ kind: 'http', status: 500, code: null });
-  });
-
-  it('fetch 자체가 실패하면 network 오류', async () => {
-    const impl = (async () => {
-      throw new TypeError('Network request failed');
-    }) as typeof fetch;
-    const err = await client(impl)
-      .me()
-      .catch((e: unknown) => e);
-    expect(isNetworkError(err)).toBe(true);
-  });
-
-  it('토큰을 붙인 요청이 401 이면 onUnauthorized 를 부른다', async () => {
-    const onUnauthorized = jest.fn();
-    const { impl } = fakeFetch(401, { code: 'UNAUTHORIZED', message: 'expired' });
-    await expect(client(impl, { getToken: () => 'old', onUnauthorized }).me()).rejects.toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ kind: 'http', status: 401, code: 'UNAUTHORIZED' });
     expect(onUnauthorized).toHaveBeenCalledTimes(1);
   });
 
-  it('로그인 시도(토큰 없음)의 401 은 로그아웃 처리하지 않는다', async () => {
-    const onUnauthorized = jest.fn();
-    const { impl } = fakeFetch(401, { code: 'UNAUTHORIZED', message: 'bad password' });
-    await expect(client(impl, { onUnauthorized }).login('a@b.co', 'x')).rejects.toBeInstanceOf(ApiError);
+  it('로그인 시도(토큰 없음)의 401 은 로그아웃 처리하지 않고 오류만 돌려준다', async () => {
+    const { client, onUnauthorized } = setup(null, jsonResponse(401, { code: 'UNAUTHORIZED', message: 'bad' }));
+    const err = await client.login('a@b.co', 'wrong-pass').catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 401 });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(toUserMessage(err, 'login')).toBe('이메일 또는 비밀번호가 맞지 않아요. 다시 확인해 주세요.');
+  });
+
+  it('401 이 아닌 오류(409)에는 onUnauthorized 를 부르지 않는다', async () => {
+    const { client, onUnauthorized } = setup('t', jsonResponse(409, { code: 'EMAIL_TAKEN', message: 'taken' }));
+    const err = await client.signup('a@b.co', 'password1').catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 409, code: 'EMAIL_TAKEN' });
     expect(onUnauthorized).not.toHaveBeenCalled();
   });
 });
 
-describe('toUserMessage: 사용자 문구', () => {
-  it('상황별 한국어 문구', () => {
-    expect(toUserMessage(new ApiError('http', 409, 'EMAIL_TAKEN', ''), 'signup')).toContain('이미 가입된');
-    expect(toUserMessage(new ApiError('http', 401, 'UNAUTHORIZED', ''), 'login')).toContain('비밀번호가 맞지 않아요');
-    expect(toUserMessage(new ApiError('http', 400, 'VALIDATION_ERROR', ''), 'signup')).toContain('8자 이상');
-    expect(toUserMessage(new ApiError('network', 0, null, ''))).toContain('서버에 연결할 수 없어요');
-    expect(toUserMessage(new Error('x'))).toContain('문제가 생겼어요');
+describe('API 클라이언트 — 네트워크 오류', () => {
+  it('서버가 꺼져 있으면(fetch 실패) network 오류로 바꾸고 죽지 않는다', async () => {
+    const { client, onUnauthorized } = setup('t', new TypeError('Failed to fetch'));
+    const err = await client.me().catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err).toMatchObject({ kind: 'network', status: 0 });
+    expect(isNetworkError(err)).toBe(true);
+    expect(onUnauthorized).not.toHaveBeenCalled();
+    expect(toUserMessage(err, 'login')).toBe(NETWORK_ERROR_MESSAGE);
+    expect(NETWORK_ERROR_MESSAGE).toContain('서버에 연결할 수 없어요');
+  });
+
+  it('응답이 시간 한도를 넘으면 network 오류로 본다', async () => {
+    const fetchImpl = jest.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }),
+    );
+    const client = createApiClient({
+      baseUrl: 'http://localhost:8080',
+      getToken: () => null,
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      timeoutMs: 10,
+    });
+    await expect(client.me()).rejects.toMatchObject({ kind: 'network' });
+  });
+
+  it('오류 본문이 JSON 이 아니어도(예: 502 HTML) 죽지 않고 http 오류로 돌려준다', async () => {
+    const { client } = setup('t', new Response('<html>Bad Gateway</html>', { status: 502 }));
+    const err = await client.me().catch((e: unknown) => e);
+    expect(err).toMatchObject({ kind: 'http', status: 502, code: null });
+    expect(toUserMessage(err)).toBe('서버에 잠시 문제가 있어요. 잠시 후 다시 시도해 주세요.');
+  });
+});
+
+describe('toUserMessage — 한국어 안내 문구', () => {
+  it('계약의 오류 코드별 문구', () => {
+    expect(toUserMessage(new ApiError('http', 409, 'EMAIL_TAKEN', 'x'), 'signup')).toBe(
+      '이미 가입된 이메일이에요. 로그인해 주세요.',
+    );
+    expect(toUserMessage(new ApiError('http', 400, 'VALIDATION_ERROR', 'x'), 'signup')).toContain('8자 이상');
+    expect(toUserMessage(new ApiError('http', 401, 'UNAUTHORIZED', 'x'))).toBe('로그인이 만료됐어요. 다시 로그인해 주세요.');
+    expect(toUserMessage(new Error('?'))).toBe('문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
   });
 });

@@ -17,7 +17,7 @@ mobile/
 │  ├─ auth/AuthContext.tsx   로그인 상태(loading / signedOut / signedIn)
 │  ├─ components/        공통 UI(ui.tsx: 접근성 기본값 강제), 로그인 폼
 │  ├─ services/          모바일 전용: API 주소 설정, 토큰 저장(expo-secure-store), API 클라이언트 연결
-│  ├─ lib/               웹과 같은 공통 로직 "사본" (아래 '공유 패키지 통합 계획' 참고)
+│  ├─ lib/               웹 src/lib 원본과 같은 공통 로직 "사본"(헤더 주석만 다름. 아래 '공유 패키지 통합 계획' 참고)
 │  └─ theme.ts           색·글자 크기·터치 영역 수치
 ```
 화면이 아닌 코드는 `src/app/` 밖에 둔다(Expo Router 가 `src/app/` 안의 파일을 모두 화면으로 본다).
@@ -49,7 +49,7 @@ mobile/
 ## 검증 명령
 ```
 npm run typecheck      # npx tsc --noEmit
-npm test               # Jest (jest-expo): 공통 로직 + API 클라이언트 테스트
+npm test               # Jest (jest-expo): 공통 로직 사본(웹 테스트 사본) + API 주소 설정 테스트
 npx expo-doctor        # 설정·의존성 버전 점검
 npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git 제외)
 ```
@@ -72,14 +72,16 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 
 | 파일 | 내용 | 테스트 |
 |------|------|--------|
-| constants.ts | 새벽 4시 기준(`RECORD_DAY_CUTOFF_HOUR`), 안내 문구, 7일 제안 기간, 면책 문구 | recordDate.test.ts 에서 확인 |
-| recordDate.ts | `toRecordDate`, `addDays` | recordDate.test.ts (웹 테스트 사본) |
-| suggestions.ts | 최근 7일 평균 제안값 | suggestions.test.ts (웹 테스트 사본) |
-| symptoms.ts | "특이사항 없음" 초기 상태와 토글 | symptoms.test.ts (웹 테스트 사본) |
-| api.ts | API 클라이언트 본체, 오류 문구 | api.test.ts (모바일에서 새로 작성) |
-| loginForm.ts | 로그인/회원가입 입력 검증 | loginForm.test.ts (모바일에서 새로 작성) |
+| constants.ts | 면책 문구, 사진 크기·형식 제한, 메모 길이 제한 | (상수만 있어 별도 테스트 없음) |
+| symptoms.ts | "특이사항 없음" 초기 상태와 토글, API 필드 변환 | symptoms.test.ts (웹 테스트 사본) |
+| api.ts | API 클라이언트 본체, 오류 문구 | api.test.ts (웹 테스트 사본) |
+| loginForm.ts | 로그인/회원가입 입력 검증 | loginForm.test.ts (웹 테스트 사본) |
 
-- 웹 테스트 사본은 `import ... from 'vitest'` 한 줄만 뺐다(Jest 전역 함수로 그대로 돈다).
+- 모바일 전용(services/): config, tokenStorage, client — 플랫폼마다 달라 사본으로 두지 않는다.
+- 웹에만 있고 아직 안 가져온 파일: todayForm, petApi, format, photo ("오늘"·반려동물·사진 화면을 만들 때 가져온다).
+- 기록 날짜(새벽 4시 기준)·제안값·안내 문구는 서버가 계산한다. 앱에서 따로 계산하지 않는다.
+- 사본은 2026-10-07 에 웹 원본과 다시 맞췄다(헤더 주석 외 동일).
+- 웹 테스트 사본은 `import ... from 'vitest'` 한 줄을 빼고 `vi.fn` → `jest.fn` 만 바꿨다(Jest 전역 함수로 그대로 돈다).
 - **지금 규칙:** 공통 로직을 고칠 때는 웹 원본을 먼저 고치고 같은 내용을 여기에 복사한다. 이 폴더만 고치지 않는다.
 - **통합 시점:** 앱 본개발 착수(2~3개월 차) 때.
 - **통합 방법(안):** 이 저장소에 `packages/shared/` 를 만들고 위 파일과 테스트를 옮긴 뒤,

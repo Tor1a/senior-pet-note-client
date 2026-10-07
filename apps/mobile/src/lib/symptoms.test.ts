@@ -1,11 +1,11 @@
-// [공유 로직 테스트 사본] 원본: web/src/lib/symptoms.test.ts (vitest import 한 줄만 빼고 jest 전역 함수로 실행)
-// web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정.
-
+// [공유 로직 테스트 사본] 원본: web/src/lib/symptoms.test.ts (2026-10-07 복사)
+// vitest import 한 줄 제거, vi.fn → jest.fn 만 바꿈(jest 전역 함수로 실행). 추후 packages/shared 로 통합 예정.
 import {
   INITIAL_SYMPTOM_STATE,
+  symptomStateFromLog,
   toggleSymptom,
   toggleSymptomNone,
-  toSymptomColumns,
+  toSymptomFields,
 } from './symptoms';
 
 describe('증상 선택 상태 — "특이사항 없음" 기본 선택', () => {
@@ -26,17 +26,26 @@ describe('증상 선택 상태 — "특이사항 없음" 기본 선택', () => {
     expect(cleared).toEqual({ none: true, codes: [], other: '' });
   });
 
-  it('저장 값: 초기 상태 그대로 저장하면 symptoms_none = true', () => {
-    expect(toSymptomColumns({ ...INITIAL_SYMPTOM_STATE, codes: [] })).toEqual({
+  it('저장 값: 초기 상태 그대로 저장하면 symptomsNone = true (계약 camelCase)', () => {
+    expect(toSymptomFields({ ...INITIAL_SYMPTOM_STATE, codes: [] })).toEqual({
       symptoms: [],
-      symptoms_none: true,
-      symptom_other: null,
+      symptomsNone: true,
+      symptomOther: null,
     });
   });
 
   it('저장 값: 기타 내용은 other 선택 시에만, 30자 제한', () => {
     const s = { none: false, codes: ['other' as const], other: '가'.repeat(40) };
-    expect(toSymptomColumns(s).symptom_other).toHaveLength(30);
-    expect(toSymptomColumns({ none: false, codes: ['vomit'], other: '무시됨' }).symptom_other).toBeNull();
+    expect(toSymptomFields(s).symptomOther).toHaveLength(30);
+    expect(toSymptomFields({ none: false, codes: ['vomit'], other: '무시됨' }).symptomOther).toBeNull();
+  });
+
+  it('저장된 기록으로 화면 상태를 되살린다', () => {
+    expect(symptomStateFromLog({ symptoms: ['other'], symptomsNone: false, symptomOther: '재채기' })).toEqual({
+      none: false,
+      codes: ['other'],
+      other: '재채기',
+    });
+    expect(symptomStateFromLog({ symptoms: [], symptomsNone: false, symptomOther: null }).none).toBe(false);
   });
 });

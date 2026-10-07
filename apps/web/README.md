@@ -104,7 +104,7 @@ src/
 ## "오늘" 화면 동작 (design/today-wireframe.md, docs/api-today.md)
 
 - **기록 날짜·제안값·새벽 4시 안내 문구는 서버가 계산**한다(`GET /api/pets/{petId}/today`). 웹에는 계산 규칙이 없다.
-  예전 `recordDate.ts`·`suggestions.ts` 와 그 테스트는 삭제했다(모바일에는 사본이 남아 있다).
+  예전 `recordDate.ts`·`suggestions.ts` 와 그 테스트는 삭제했다(모바일 사본도 2026-10-07 에 삭제했다).
 - 투약 카드: 탭하면 바로 체크 표시(낙관적 업데이트) 후 `POST /api/med-logs`. 실패하면 되돌리고 안내한다.
   다시 탭하면 `DELETE` 로 취소. 체크한 약은 0.3초 뒤 한 줄로 접히고, 그동안 아래 영역 입력을 잠시 막는다.
   - 409 `ALREADY_CHECKED` → 체크 상태 유지 후 서버 값으로 다시 맞춤 / 404(목록에서 뺀 약) → 목록 새로 고침
