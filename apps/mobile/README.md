@@ -6,7 +6,7 @@ Expo SDK 57 + TypeScript + Expo Router. 본격 개발은 웹 MVP 검증 후(2~3�
 ## 폴더 구조
 ```
 mobile/
-├─ app.json              Expo 설정 (이름, scheme, 플러그인)
+├─ app.config.ts         Expo 설정 (이름, scheme, 플러그인. Firebase 설정 파일이 있을 때만 RNFB 플러그인 추가)
 ├─ .env.example          환경변수 예시 → .env 로 복사해서 사용
 ├─ src/
 │  ├─ app/               화면(Expo Router: 파일 하나 = 화면 하나)
@@ -93,7 +93,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 ## 앞으로 할 일
 1. "오늘" 화면 본구현: 투약 카드 → 식사·물 → 증상 → 체중·메모 (와이어프레임 그대로). 백엔드 기록 API 가 나오면 연결.
 2. 반려동물 등록·선택, 사진 업로드(`expo-image-picker`, MVP 결정 2).
-3. **푸시 알림(투약 알림):** `expo-notifications` 사용. 로컬 알림부터 시작하고, 서버 발송 푸시는 백엔드에 기기 토큰 저장 API 가 필요하다. 안드로이드 원격 푸시는 Expo Go 에서 지원되지 않아 개발 빌드가 필요하다.
+3. **푸시 알림(투약 알림):** `@react-native-firebase/messaging` 으로 구현됨(받기만, 규칙 편집은 웹). 개발 빌드(`npx expo prebuild` + `npx expo run:android`)와 `google-services.json`(앱 루트, git 제외, 패키지명 `com.oraegyeot.seniorpet`)이 필요하다. Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 알림만 꺼진다. 플랫폼별로 따로 판단하며 한쪽 파일만 있으면 경고를 출력하고 그쪽만 켠다. **EAS 클라우드 빌드**는 git 에 없는 설정 파일이 올라가지 않으므로 file secret 으로 넣는다: `eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`(iOS 는 `GOOGLE_SERVICE_INFO_PLIST`). app.config.ts 가 이 환경변수 경로를 읽는다. iOS 는 `GoogleService-Info.plist` + APNs 키 + Apple 개발자 팀 필요(미검증).
 4. `packages/shared` 통합 (위 계획).
 5. 화면 컴포넌트 테스트(`@testing-library/react-native`)는 화면이 실제로 생기면 추가.
 6. 운영 API 는 반드시 `https://` 로. 정식(릴리스) 빌드의 안드로이드는 기본적으로 `http://` 통신을 막는다.
@@ -103,3 +103,8 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - Expo/EAS 계정 가입, EAS Build·Submit·Update 사용(무료 한도 초과 시 유료), 빌드 업로드, 스토어 등록 정보 작성은
   모두 외부 공개·비용과 연결되므로 대표 승인 후 진행한다. 지금 뼈대 단계에서는 어떤 계정도 만들지 않았다.
 - 개발 빌드(`npx expo run:android`)는 로컬에서 무료로 가능하지만 Android Studio 설치가 필요하다.
+
+### 실기기에서 확인할 것 (알림)
+- 웹: 서비스워커가 설치되는 중(첫 방문 직후)에 [알림 받기]를 눌렀을 때 토큰 발급이 되는지(코드는 활성화를 최대 10초 기다림)
+- 알림 탭 시 `?source=push&med=<id>` 로 열려 카드가 강조되는지, 오늘 화면이 이미 열려 있을 때 배너 버튼 동작
+- 알림 배너가 노치·상태바 아래에 놓이는지(안전 영역 반영)

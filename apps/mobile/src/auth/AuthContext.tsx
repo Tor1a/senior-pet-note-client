@@ -11,6 +11,7 @@ import type { AuthMode } from '../lib/loginForm';
 import type { User } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { api, onUnauthorized } from '../services/client';
+import { releaseMobileDevice } from '../services/pushDevice';
 import { clearToken, loadToken, saveToken } from '../services/tokenStorage';
 
 export type AuthStatus = 'loading' | 'signedOut' | 'signedIn';
@@ -64,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(
     () =>
       onUnauthorized(() => {
+        // 토큰이 이미 무효라 서버 해제는 못 한다 → Firebase 토큰과 로컬 기기 id 만 정리
+        void releaseMobileDevice(false);
         setUser(null);
         setStatus('signedOut');
       }),
@@ -79,7 +82,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
-    // 서버에 로그아웃 API 는 없다(JWT, refresh 없음). 기기에서 토큰만 지운다.
+    // 서버에 로그아웃 API 는 없다(JWT, refresh 없음). 다만 이 기기 알림은 로그인 토큰을 지우기 전에
+    // 해제한다(DELETE /api/devices/{id}, 최대 3초, 실패해도 진행).
+    await releaseMobileDevice(true);
     await clearToken();
     setUser(null);
     setStatus('signedOut');

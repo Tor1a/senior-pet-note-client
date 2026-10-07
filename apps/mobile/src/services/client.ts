@@ -5,6 +5,7 @@
 
 import { Platform } from 'react-native';
 import { createApiClient } from '../lib/api';
+import { createReminderApi } from '../lib/reminderApi';
 import { resolveApiConfig } from './config';
 import { clearToken, getToken } from './tokenStorage';
 
@@ -31,3 +32,5 @@ export const api = createApiClient({
     unauthorizedListeners.forEach((listener) => listener());
   },
 });
+
+export const reminderApi = createReminderApi(api);

@@ -8,6 +8,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAuth } from '../auth/AuthContext';
 import { AppText } from '../components/ui';
+import { PushProvider } from '../push/PushProvider';
 import { colors, spacing } from '../theme';
 
 function RootNavigator() {
@@ -26,7 +27,7 @@ function RootNavigator() {
   }
 
   const signedIn = status === 'signedIn';
-  return (
+  const navigator = (
     <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}>
       <Stack.Protected guard={signedIn}>
         <Stack.Screen name="index" />
@@ -37,6 +38,8 @@ function RootNavigator() {
       </Stack.Protected>
     </Stack>
   );
+  // 알림 기능은 로그인한 동안에만 동작한다
+  return signedIn ? <PushProvider>{navigator}</PushProvider> : navigator;
 }
 
 export default function RootLayout() {
