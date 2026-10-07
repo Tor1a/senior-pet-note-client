@@ -1,3 +1,6 @@
 node_modules/
 .DS_Store
 # 각 앱의 상세 제외 규칙은 apps/web/.gitignore, apps/mobile/.gitignore 참고
+
+# 회사 문서(로컬 전용)
+.company/
