@@ -2,7 +2,7 @@
 
 - 작성: developer / 2026-10-06 (기술 스택 변경 반영: `docs/decisions/2026-10-06-기술-스택-변경.md`)
 - 스택: Vite 8 + React 19 + TypeScript, vite-plugin-pwa(manifest·서비스워커), Vitest
-- 백엔드: Java(Spring Boot) API (`projects/senior-pet-note/backend/`, 다른 개발자 담당). **Supabase 는 쓰지 않는다.**
+- 백엔드: Java(Spring Boot) API (별도 저장소 `senior-pet-note-api`). **Supabase 는 쓰지 않는다.**
 - 범위: **로컬 실행만.** 배포는 대표 승인 후 진행한다.
 
 ## 실행 순서
@@ -11,12 +11,11 @@
 
 ### 1) 백엔드를 먼저 띄운다
 
-백엔드와 `docker-compose.yml` 은 `projects/senior-pet-note/backend/` 쪽에서 만들고 있다. 정확한 명령은
-백엔드 README 를 따른다. 예상 형태는 다음과 같다.
+백엔드와 DB(`docker-compose.yml`)는 별도 저장소 `senior-pet-note-api` 에 있다. 실행 명령은 그 저장소 README 를 따른다.
 
 ```bash
-cd projects/senior-pet-note
-docker compose up -d          # PostgreSQL + Java API → http://localhost:8080
+cd ../senior-pet-note-api     # 로컬에 나란히 클론해 둔 경우
+docker compose up -d          # PostgreSQL → 이어서 README 의 "서버 실행" 명령으로 API(http://localhost:8080) 실행
 ```
 
 - 백엔드가 꺼져 있어도 웹은 멈추지 않는다. 로그인 시도 때 **"서버에 연결할 수 없어요"** 안내가 뜬다.
@@ -26,7 +25,7 @@ docker compose up -d          # PostgreSQL + Java API → http://localhost:8080
 ### 2) 웹 실행
 
 ```bash
-cd projects/senior-pet-note/web
+cd apps/web
 
 npm install
 
