@@ -27,7 +27,8 @@ export function PetProvider({ children }: { children: ReactNode }) {
   const [pet, setPetState] = useState<Pet | null>(null);
 
   const reload = useCallback(async () => {
-    setStatus('loading');
+    // 이미 반려동물을 보여 주고 있으면 화면을 언마운트하지 않도록 ready 를 유지한다(조용한 재확인)
+    setStatus((prev) => (prev === 'ready' ? prev : 'loading'));
     try {
       const pets = await petApi.listPets();
       const first = pets?.[0] ?? null;

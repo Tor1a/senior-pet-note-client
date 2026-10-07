@@ -102,6 +102,21 @@ export function stepWeight(text: string, delta: number): string {
   return formatKg(next);
 }
 
+/**
+ * 체중 입력칸 보정. 일부 기기의 소수점 키(,)는 점으로 바꾸고, 숫자·점 외 문자는 지우며, 점은 첫 개만 남긴다.
+ * 예: "4,35" → "4.35", "4.3.5" → "4.35"
+ */
+export function sanitizeWeightInput(raw: string): string {
+  const cleaned = raw.replace(/,/g, '.').replace(/[^\d.]/g, '');
+  const dot = cleaned.indexOf('.');
+  return dot < 0 ? cleaned : cleaned.slice(0, dot + 1) + cleaned.slice(dot + 1).replace(/\./g, '');
+}
+
+/** 물(ml) 입력칸 보정: 숫자만 남긴다 */
+export function sanitizeMlInput(raw: string): string {
+  return raw.replace(/[^\d]/g, '');
+}
+
 /** 저장 전 입력 확인. 문제가 있으면 한국어 안내 문구, 없으면 null */
 export function validateTodayForm(form: TodayForm): string | null {
   if (form.waterMode === 'ml' && form.waterMl.text.trim() !== '') {

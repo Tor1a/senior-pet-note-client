@@ -371,6 +371,79 @@ describe('오늘 화면 — 투약 체크', () => {
     expect(doseBox(/오전 8:00/).getAttribute('aria-checked')).toBe('false');
     await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/med-logs/uuid')).toBe(true));
   });
+
+  it('체크 취소 중 늦게 도착한 오래된 GET /today 응답이 낙관적 상태를 덮어쓰지 않는다', async () => {
+    let todayCalls = 0;
+    let releaseStale!: () => void;
+    const staleGate = new Promise<void>((r) => (releaseStale = r));
+    mockServer({
+      'GET /api/pets/pet-1/today': async () => {
+        todayCalls += 1;
+        if (todayCalls === 1) return json(200, todayExample());
+        await staleGate; // 두 번째 조회는 오래 걸리고, 그 사이 체크 상태가 바뀐다(응답은 취소 전 상태)
+        return json(200, todayExample());
+      },
+      'POST /api/med-logs': () => json(409, { code: 'ALREADY_CHECKED', message: 'already' }), // → 재동기 시작
+      'DELETE /api/med-logs/uuid': () => new Response(null, { status: 204 }),
+    });
+    renderToday();
+    const user = userEvent.setup();
+    await user.click(await waitFor(() => doseBox(/오후 8:00/)));
+    await waitFor(() => expect(todayCalls).toBe(2));
+    await user.click(doseBox(/오전 8:00/)); // 취소(DELETE 성공)
+    await waitFor(() => expect(doseBox(/오전 8:00/).getAttribute('aria-checked')).toBe('false'));
+    releaseStale();
+    await new Promise((r) => setTimeout(r, 50));
+    expect(doseBox(/오전 8:00/).getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('응답 대기 중인 회차는 재동기 응답이 와도 낙관적 체크 상태를 유지하고, 연타해도 POST 는 한 번', async () => {
+    let releasePost!: () => void;
+    const postGate = new Promise<void>((r) => (releasePost = r));
+    let todayCalls = 0;
+    const calls = mockServer({
+      'GET /api/pets/pet-1/today': () => {
+        todayCalls += 1;
+        return json(200, todayExample());
+      },
+      'POST /api/med-logs': async () => {
+        await postGate;
+        return json(201, { id: 'log-9', medicationId: 'uuid', recordDate: '2026-10-06', scheduledTime: '20:00', takenAt: '2026-10-06T11:00:00Z' });
+      },
+      'DELETE /api/med-logs/uuid': () => json(404, { code: 'NOT_FOUND', message: 'x' }), // → 재동기 시작
+    });
+    renderToday();
+    const user = userEvent.setup();
+    const evening = await waitFor(() => doseBox(/오후 8:00/));
+    await user.click(evening);
+    await user.click(evening);
+    await user.click(evening);
+    await user.click(doseBox(/오전 8:00/)); // 취소 404 → GET /today (서버는 저녁을 아직 안 먹인 것으로 앎)
+    await waitFor(() => expect(todayCalls).toBe(2));
+    await new Promise((r) => setTimeout(r, 50));
+    expect(doseBox(/오후 8:00/).getAttribute('aria-checked')).toBe('true');
+    releasePost();
+    await waitFor(() => expect(doseBox(/오후 8:00/).getAttribute('aria-disabled')).toBeNull());
+    expect(doseBox(/오후 8:00/).getAttribute('aria-checked')).toBe('true');
+    expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/med-logs')).toHaveLength(1);
+  });
+
+  it('취소가 404 이고 재동기도 실패해도 대기 상태가 풀려 다시 누를 수 있다', async () => {
+    let todayCalls = 0;
+    mockServer({
+      'GET /api/pets/pet-1/today': () => {
+        todayCalls += 1;
+        return todayCalls === 1 ? json(200, todayExample()) : json(500, { code: 'INTERNAL', message: 'x' });
+      },
+      'DELETE /api/med-logs/uuid': () => json(404, { code: 'NOT_FOUND', message: 'x' }),
+    });
+    renderToday();
+    const user = userEvent.setup();
+    await user.click(await waitFor(() => doseBox(/오전 8:00/)));
+    await waitFor(() => expect(todayCalls).toBe(2));
+    await waitFor(() => expect(doseBox(/오전 8:00/).getAttribute('aria-disabled')).toBeNull());
+    expect(doseBox(/오전 8:00/).getAttribute('aria-checked')).toBe('false');
+  });
 });
 
 describe('오늘 화면 — 오류 처리', () => {

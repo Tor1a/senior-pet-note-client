@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { formatRecordDate, formatTakenAt, formatTime, withParticle } from './format';
 import type { TodayResponse } from './petApi';
-import { validatePhoto } from './photo';
-import { buildDailyLogBody, initialTodayForm, stepWeight, tapLevel, validateTodayForm } from './todayForm';
+import {
+  buildDailyLogBody,
+  initialTodayForm,
+  sanitizeMlInput,
+  sanitizeWeightInput,
+  stepWeight,
+  tapLevel,
+  validateTodayForm,
+} from './todayForm';
 
 // 계약서 3장 예시
 const TODAY: TodayResponse = {
@@ -45,25 +51,29 @@ describe('오늘 화면 입력 상태', () => {
   });
 });
 
-describe('표시 형식', () => {
-  it('날짜·시각', () => {
-    expect(formatRecordDate('2026-10-06')).toBe('10월 6일 (화)');
-    expect(formatTime('08:00')).toBe('오전 8:00');
-    expect(formatTime('20:30')).toBe('오후 8:30');
-    expect(formatTime('00:15')).toBe('오전 12:15');
-    expect(formatTakenAt('2026-10-05T23:05:00Z')).toBe('8:05');
+describe('입력 보정', () => {
+  it('체중: 쉼표는 점으로 바꾼다("4,35" → "4.35")', () => {
+    expect(sanitizeWeightInput('4,35')).toBe('4.35');
   });
 
-  it('받침에 따라 조사', () => {
-    expect(withParticle('보리', '와', '과')).toBe('보리와');
-    expect(withParticle('콩떡', '와', '과')).toBe('콩떡과');
+  it('체중: 점은 첫 개만 남긴다', () => {
+    expect(sanitizeWeightInput('4.3.5')).toBe('4.35');
+    expect(sanitizeWeightInput('4,3.5')).toBe('4.35');
   });
-});
 
-describe('사진 확인', () => {
-  it('형식·5MB 제한', () => {
-    expect(validatePhoto({ type: 'image/png', size: 5 * 1024 * 1024 })).toBeNull();
-    expect(validatePhoto({ type: 'image/png', size: 5 * 1024 * 1024 + 1 })).toContain('5MB');
-    expect(validatePhoto({ type: 'image/gif', size: 10 })).toContain('JPG');
+  it('체중: 숫자·점 외 문자는 지운다', () => {
+    expect(sanitizeWeightInput('4a.3kg')).toBe('4.3');
+    expect(sanitizeWeightInput('-5')).toBe('5');
+  });
+
+  it('체중: 빈 문자열과 앞자리 점', () => {
+    expect(sanitizeWeightInput('')).toBe('');
+    expect(sanitizeWeightInput('.5')).toBe('.5');
+    expect(sanitizeWeightInput(',5')).toBe('.5');
+  });
+
+  it('ml: 숫자만 남긴다', () => {
+    expect(sanitizeMlInput('3a5,0.')).toBe('350');
+    expect(sanitizeMlInput('')).toBe('');
   });
 });

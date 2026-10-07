@@ -4,17 +4,8 @@ import PetAvatar from '../components/PetAvatar';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
-import {
-  ageText,
-  daysBetween,
-  formatKg,
-  formatRecordDate,
-  formatTakenAt,
-  formatTime,
-  LEVEL_LABELS,
-  withParticle,
-} from '../lib/format';
-import type { DailyLog, Dose, TodayResponse } from '../lib/petApi';
+import { daysBetween, formatKg, formatRecordDate, LEVEL_LABELS, withParticle } from '../lib/format';
+import type { DailyLog, TodayResponse } from '../lib/petApi';
 import {
   SYMPTOM_CODES,
   SYMPTOM_LABELS,
@@ -27,12 +18,36 @@ import {
   buildDailyLogBody,
   initialTodayForm,
   isFirstUse,
+  sanitizeMlInput,
+  sanitizeWeightInput,
   stepWeight,
   tapLevel,
   validateTodayForm,
   type LevelField,
   type TodayForm,
 } from '../lib/todayForm';
+import {
+  applyCheckResult,
+  applyUncheckResult,
+  COLLAPSE_DELAY_MS,
+  collapseTaken,
+  daysAgoText,
+  doseKey,
+  doseLabel,
+  doseParts,
+  headerInfo as buildHeaderInfo,
+  HIGHLIGHT_MS,
+  markTaken,
+  markUntaken,
+  mergeServerDoses,
+  pickHighlightKey,
+  restoreDose,
+  rollback,
+  settleDose,
+  SHIFT_GUARD_EXTRA_MS,
+  toDoseViews,
+  type DoseView,
+} from '../lib/todayDoses';
 import { usePet } from '../pet';
 import { usePushMessages } from '../push/PushProvider';
 
@@ -40,23 +55,8 @@ import { usePushMessages } from '../push/PushProvider';
 // - 기록 날짜·제안값·새벽 4시 안내 문구는 서버(GET /today)가 준 값을 그대로 쓴다.
 // - 투약 체크는 탭 즉시 저장(낙관적 업데이트), 일일 기록은 [저장]을 눌러야 확정한다.
 
-/** 체크한 약 카드를 한 줄로 접기까지 기다리는 시간 (와이어프레임 개발자 메모 6) */
-export const COLLAPSE_DELAY_MS = 300;
-/** 접힌 뒤 아래 영역 입력을 조금 더 막아 잘못 탭하는 일을 줄인다 */
-const SHIFT_GUARD_EXTRA_MS = 150;
 const TOAST_MS = 3000;
-/** 알림으로 열었을 때 "방금 알림 온 약" 강조를 유지하는 시간 (설계서 9-4) */
-export const HIGHLIGHT_MS = 2 * 60 * 1000;
 const WATER_MODE_KEY = 'spn.waterMode';
-
-interface DoseView extends Dose {
-  /** 서버 응답을 기다리는 중 */
-  pending: boolean;
-  /** 한 줄로 접힘 */
-  collapsed: boolean;
-}
-
-const doseKey = (d: Dose) => `${d.medicationId}@${d.scheduledTime}`;
 
 function readPreferMl(): boolean {
   try {
@@ -124,7 +124,7 @@ export default function TodayPage() {
 
   const applyToday = useCallback((t: TodayResponse) => {
     setToday(t);
-    setDoses(t.doses.map((d) => ({ ...d, pending: false, collapsed: d.taken })));
+    setDoses(toDoseViews(t.doses));
     setSavedLog(t.dailyLog);
     setForm(initialTodayForm(t, readPreferMl()));
   }, []);
@@ -141,11 +141,18 @@ export default function TodayPage() {
   }, [petId, applyToday, isPetGone]);
 
   /** 투약 상태만 서버와 맞춘다(입력 중인 기록은 건드리지 않음) */
+  // 응답 순서가 뒤바뀌어도 최신 요청의 응답만 반영한다(요청 시작 시 번호를 올리고, 체크·취소 시작·끝에서도 올려 이전 요청을 무효화).
+  const syncSeq = useRef(0);
+  const invalidateSync = () => {
+    syncSeq.current += 1;
+  };
   const syncDoses = useCallback(async () => {
     if (!petId) return;
+    const seq = ++syncSeq.current;
     try {
       const t = await petApi.getToday(petId);
-      setDoses(t.doses.map((d) => ({ ...d, pending: false, collapsed: d.taken })));
+      if (seq !== syncSeq.current) return; // 더 새 요청이 있거나 그 사이 체크·취소가 있었음
+      setDoses((list) => mergeServerDoses(list, t.doses)); // 응답 대기 중인 회차는 낙관적 상태 유지
     } catch (err) {
       isPetGone(err);
     }
@@ -169,11 +176,10 @@ export default function TodayPage() {
     const t = window.setTimeout(() => setHighlightExpired(true), HIGHLIGHT_MS);
     return () => window.clearTimeout(t);
   }, [medParam]);
-  const highlightKey = useMemo(() => {
-    if (!medParam || highlightExpired) return null;
-    const d = doses.find((x) => x.medicationId === medParam && !x.taken);
-    return d ? doseKey(d) : null;
-  }, [medParam, highlightExpired, doses]);
+  const highlightKey = useMemo(
+    () => pickHighlightKey(doses, medParam, highlightExpired),
+    [medParam, highlightExpired, doses],
+  );
 
   // today_opened: 화면을 열 때 한 번. 실패해도 화면에는 영향 없음
   useEffect(() => {
@@ -194,37 +200,36 @@ export default function TodayPage() {
     if (el.closest('button, [role="checkbox"], [role="radio"]')) taps.current += 1;
   }
 
-  function updateDose(key: string, patch: Partial<DoseView>) {
-    setDoses((list) => list.map((d) => (doseKey(d) === key ? { ...d, ...patch } : d)));
-  }
-
   async function toggleDose(dose: DoseView) {
     if (dose.pending) return;
     const key = doseKey(dose);
     setDoseMessage(null);
+    invalidateSync();
 
     if (!dose.taken) {
       // 낙관적 업데이트: 바로 체크 표시 → 0.3초 뒤 한 줄로 접기
-      updateDose(key, { taken: true, pending: true, takenAt: new Date().toISOString() });
+      setDoses((list) => markTaken(list, key, new Date().toISOString()));
       setShifting(true);
       later(() => {
-        setDoses((list) => list.map((d) => (doseKey(d) === key && d.taken ? { ...d, collapsed: true } : d)));
+        setDoses((list) => collapseTaken(list, key));
       }, COLLAPSE_DELAY_MS);
       later(() => setShifting(false), COLLAPSE_DELAY_MS + SHIFT_GUARD_EXTRA_MS);
       try {
         const log = await petApi.checkMed(dose.medicationId, dose.scheduledTime);
-        updateDose(key, { pending: false, medLogId: log.id, takenAt: log.takenAt });
+        invalidateSync();
+        setDoses((list) => applyCheckResult(list, key, log));
         void petApi.sendEvent('med_checked');
       } catch (err) {
+        invalidateSync();
         if (err instanceof ApiError && err.code === 'ALREADY_CHECKED') {
           // 다른 기기에서 이미 체크함 → 체크 상태 유지, 서버 값(medLogId)으로 맞춘다
-          updateDose(key, { pending: false });
+          setDoses((list) => settleDose(list, key));
           setDoseMessage('이미 체크된 약이라 화면을 맞췄어요.');
           void syncDoses();
           return;
         }
         // 실패 → 되돌리고 안내
-        updateDose(key, { taken: false, pending: false, takenAt: null, medLogId: null, collapsed: false });
+        setDoses((list) => rollback(list, key));
         if (err instanceof ApiError && err.status === 404) {
           // 백엔드 규칙: 목록에서 뺀(비활성) 약을 체크하면 404 → 최신 목록으로 맞춘다
           setDoseMessage('목록에서 뺀 약이에요. 약 목록을 새로 불러왔어요.');
@@ -248,17 +253,20 @@ export default function TodayPage() {
       return;
     }
     const before = { ...dose };
-    updateDose(key, { taken: false, pending: true, collapsed: false, takenAt: null });
+    setDoses((list) => markUntaken(list, key));
     try {
       await petApi.uncheckMed(dose.medLogId);
-      updateDose(key, { pending: false, medLogId: null });
+      invalidateSync();
+      setDoses((list) => applyUncheckResult(list, key));
     } catch (err) {
+      invalidateSync();
       if (err instanceof ApiError && err.status === 404) {
-        // 이미 취소된 기록 → 서버와 맞춘다
+        // 이미 취소된 기록 → 먼저 대기 상태를 풀고(재동기가 실패해도 잠기지 않게) 서버와 맞춘다
+        setDoses((list) => applyUncheckResult(list, key));
         void syncDoses();
         return;
       }
-      updateDose(key, { ...before, pending: false });
+      setDoses((list) => restoreDose(list, key, before));
       if (err instanceof ApiError && err.status === 401) return;
       setDoseMessage(`취소하지 못했어요. ${toUserMessage(err, 'medLog')}`);
     }
@@ -307,9 +315,7 @@ export default function TodayPage() {
 
   // ---------- 화면 ----------
   const name = pet?.name ?? '';
-  const headerInfo = [name, pet && today ? ageText(pet.birthYear, today.recordDate) : '', pet?.conditions ?? '']
-    .filter(Boolean)
-    .join(' · ');
+  const headerInfo = buildHeaderInfo(pet, today);
   const takenCount = doses.filter((d) => d.taken).length;
   const firstUse = today ? isFirstUse(today) : false;
   const saveLabel = saving ? '저장하는 중…' : savedLog ? '기록 수정하기' : firstUse ? '첫 기록 저장' : '오늘 기록 저장';
@@ -446,8 +452,8 @@ export default function TodayPage() {
                           setForm({
                             ...form,
                             waterMl: {
-                              text: e.target.value.replace(/[^\d]/g, ''),
-                              source: e.target.value ? 'confirmed' : 'empty',
+                              text: sanitizeMlInput(e.target.value),
+                              source: sanitizeMlInput(e.target.value) ? 'confirmed' : 'empty',
                             },
                           })
                         }
@@ -523,9 +529,10 @@ export default function TodayPage() {
                     type="button"
                     aria-label="0.1kg 빼기"
                     disabled={!form.weight.text}
-                    onClick={() =>
-                      setForm({ ...form, weight: { ...form.weight, text: stepWeight(form.weight.text, -0.1), measured: true } })
-                    }
+                    onClick={() => {
+                      const text = stepWeight(form.weight.text, -0.1);
+                      if (text !== form.weight.text) setForm({ ...form, weight: { ...form.weight, text, measured: true } });
+                    }}
                   >
                     −
                   </button>
@@ -537,7 +544,7 @@ export default function TodayPage() {
                       value={form.weight.text}
                       placeholder="-.-"
                       onChange={(e) => {
-                        const text = e.target.value.replace(/[^\d.]/g, '');
+                        const text = sanitizeWeightInput(e.target.value);
                         setForm({ ...form, weight: { ...form.weight, text, measured: text !== '' } });
                       }}
                     />
@@ -547,9 +554,10 @@ export default function TodayPage() {
                     type="button"
                     aria-label="0.1kg 더하기"
                     disabled={!form.weight.text}
-                    onClick={() =>
-                      setForm({ ...form, weight: { ...form.weight, text: stepWeight(form.weight.text, 0.1), measured: true } })
-                    }
+                    onClick={() => {
+                      const text = stepWeight(form.weight.text, 0.1);
+                      if (text !== form.weight.text) setForm({ ...form, weight: { ...form.weight, text, measured: true } });
+                    }}
                   >
                     +
                   </button>
@@ -617,12 +625,6 @@ export default function TodayPage() {
   );
 }
 
-function daysAgoText(days: number): string {
-  if (days <= 0) return '오늘';
-  if (days === 1) return '어제';
-  return `${days}일 전`;
-}
-
 function DoseItem({ dose, highlight, onToggle }: { dose: DoseView; highlight: boolean; onToggle: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -631,12 +633,8 @@ function DoseItem({ dose, highlight, onToggle }: { dose: DoseView; highlight: bo
     ref.current.focus({ preventScroll: true });
   }, [highlight]);
 
-  const what = [dose.name, dose.doseText].filter(Boolean).join(' ');
-  const time = formatTime(dose.scheduledTime);
-  const takenText = dose.taken && dose.takenAt ? `${formatTakenAt(dose.takenAt)} 먹임` : '먹임';
-  const label = dose.taken
-    ? `${time} ${what}, ${takenText}. 누르면 체크를 취소해요`
-    : `${time} ${what}, 아직 체크하지 않았어요. 누르면 먹였어요로 체크해요`;
+  const { what, time, takenText } = doseParts(dose);
+  const label = doseLabel(dose);
 
   if (dose.taken && dose.collapsed) {
     return (
