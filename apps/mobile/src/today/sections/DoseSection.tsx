@@ -16,11 +16,14 @@ interface DoseSectionProps {
   onHighlight: (node: View) => void;
   /** 약 관리 화면으로(약 카드를 누르면 체크라서 카드 밖에 별도 버튼으로 둔다) */
   onManage: () => void;
+  /** 지난 기록 보기 화면으로 */
+  onHistory: () => void;
   /** 약 등록 화면으로(약이 하나도 없을 때) */
   onAdd: () => void;
 }
 
-export function DoseSection({ doses, cutoffNotice, message, highlightKey, onToggle, onHighlight, onManage, onAdd }: DoseSectionProps) {
+export function DoseSection({ doses, cutoffNotice, message, highlightKey, onToggle, onHighlight, onManage, onHistory, onAdd }: DoseSectionProps) {
+  const { fontScale } = useWindowDimensions();
   const takenCount = doses.filter((d) => d.taken).length;
   return (
     <View style={styles.section}>
@@ -52,7 +55,16 @@ export function DoseSection({ doses, cutoffNotice, message, highlightKey, onTogg
           ))}
         </>
       )}
-      {doses.length > 0 && <AppButton label="약 관리 ›" accessibilityLabel="약 관리" variant="secondary" onPress={onManage} />}
+      <View style={[styles.links, isLargeFont(fontScale) && styles.linksStacked]}>
+        {doses.length > 0 && (
+          <View style={styles.linkItem}>
+            <AppButton label="약 관리 ›" accessibilityLabel="약 관리" variant="secondary" onPress={onManage} />
+          </View>
+        )}
+        <View style={styles.linkItem}>
+          <AppButton label="지난 기록 보기 ›" accessibilityLabel="지난 기록 보기" variant="secondary" onPress={onHistory} />
+        </View>
+      </View>
       {message && (
         <AppText accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.bold}>
           {`! ${message}`}
@@ -145,6 +157,9 @@ function DoseItem({
 
 const styles = StyleSheet.create({
   section: { gap: spacing.sm },
+  links: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  linksStacked: { flexDirection: 'column', flexWrap: 'nowrap' },
+  linkItem: { flexGrow: 1, flexBasis: 140 },
   h2: { fontSize: 20 },
   bold: { fontWeight: '700' },
   card: {

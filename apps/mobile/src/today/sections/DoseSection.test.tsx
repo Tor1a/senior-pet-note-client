@@ -19,6 +19,7 @@ function ui(list = doses) {
       onToggle={jest.fn()}
       onHighlight={jest.fn()}
       onManage={jest.fn()}
+      onHistory={jest.fn()}
       onAdd={jest.fn()}
     />
   );
@@ -44,7 +45,7 @@ describe('DoseSection — 이름과 용량 배치', () => {
     setFontScale(2);
     const onToggle = jest.fn();
     await render(
-      <DoseSection doses={doses} cutoffNotice="" message={null} highlightKey={null} onToggle={onToggle} onHighlight={jest.fn()} onManage={jest.fn()} onAdd={jest.fn()} />,
+      <DoseSection doses={doses} cutoffNotice="" message={null} highlightKey={null} onToggle={onToggle} onHighlight={jest.fn()} onManage={jest.fn()} onHistory={jest.fn()} onAdd={jest.fn()} />,
     );
     await fireEvent.press(screen.getByRole('checkbox', { name: /아조딜 1\/2정, 아직 체크하지 않았어요/ }));
     expect(onToggle).toHaveBeenCalledTimes(1);

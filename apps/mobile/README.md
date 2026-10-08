@@ -86,6 +86,16 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 화면 사이 안내는 라우트 파라미터 `notice` 에 고정 코드(created/updated/gone)만 싣고, 약 이름은 목록이 불러온 목록에서 `medId` 로 찾는다.
 - 알려진 한계: iOS 확인 못 함(장비 없음). Android 에뮬레이터에서 글자 200% 화면은 눈으로 확인했으나 TalkBack 등 스크린리더 동작은 미확인. 온보딩(`?onboarding=1`)은 만들지 않았다(앱에 반려동물 등록 화면이 없음).
 
+## 지난 기록 보기·체중 그래프 (2026-10-08)
+- 오늘 화면의 [약 관리 ›] 옆 [지난 기록 보기 ›](약이 없어도 보임, 글자 1.3배 이상이면 세로로 쌓임)에서 들어간다. 라우트: `/history`(H1), `/history/[recordDate]`(H2, 읽기 전용, 전날/다음 날은 `replace`).
+- 서버 `GET /api/pets/{petId}/daily-logs`(계약: 백엔드 `docs/api-history.md`)를 **파라미터 없이 한 번** 호출해 30일치를 받고, 7일/30일 전환은 화면에서 자른다(재요청 없음, 기본 30일). H2 는 `from=to=날짜`.
+- 공유 사본: `lib/petApi.ts`(HistoryResponse·getHistory), `historyStats.ts`, `chartGeometry.ts`, `historyText.ts`(+금지어 검사), `historyFixtures.ts`(테스트 보조). 화면·그래프(`src/history/`)는 모바일 전용.
+- 그래프는 `react-native-svg` 15.15.4(SDK 57 번들 버전, `npx expo install react-native-svg`). 선·점만 SVG 로 그리고 축 숫자는 RN 글자라 글자 크기 설정을 따른다. 스크린리더에는 그래프 전체가 요약 문장 하나로 읽힌다.
+- 표 보기: [표로 보기]로 날짜별 행 목록(날짜·체중·증상). **스크린리더가 켜져 있거나 글자 배율 2.0 이상이면 표 보기가 기본**이다.
+- 오프라인: 이미 불러온 내용은 메모리에서 그대로 보여 주고 "마지막으로 불러온 시각: 오후 3:20 · 지금은 연결이 끊겨 있어요."를 알린다. **디스크에는 저장하지 않는다**(앱을 다시 켜면 사라짐). [새로 불러오기]·당겨서 새로고침으로 다시 읽는다.
+- **`react-native-svg` 는 네이티브 모듈이라 개발 빌드를 한 번 다시 만들어야 한다**: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)` 후 `CI=1 npx expo run:android`(JDK 25 금지). Expo Go 에는 포함돼 있다고 알려져 있으나 이번에 Expo Go 실기기 구동은 **확인하지 못했다**(푸시 때문에 개발 빌드가 기준).
+- Jest 에서는 `react-native-svg` 를 가벼운 껍데기로 바꿔 쓰고(좌표 계산은 `chartGeometry` 테스트가 보장), 그래프의 실제 그리기는 에뮬레이터에서 눈으로 확인했다.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
@@ -127,7 +137,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 2. 반려동물 등록·선택, 사진 업로드(`expo-image-picker`, MVP 결정 2).
 3. **푸시 알림(투약 알림):** `@react-native-firebase/messaging` 으로 구현됨. 알림 규칙(켜기/끄기·매일/요일/N일 간격·기간)은 앱의 약 관리 → 알림 설정 화면에서 정한다(웹과 같은 기능). 개발 빌드(`npx expo prebuild` + `npx expo run:android`)와 `google-services.json`(앱 루트, git 제외, 패키지명 `com.oraegyeot.seniorpet`)이 필요하다. Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 알림만 꺼진다. 플랫폼별로 따로 판단하며 한쪽 파일만 있으면 경고를 출력하고 그쪽만 켠다. **EAS 클라우드 빌드**는 git 에 없는 설정 파일이 올라가지 않으므로 file secret 으로 넣는다: `eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`(iOS 는 `GOOGLE_SERVICE_INFO_PLIST`). app.config.ts 가 이 환경변수 경로를 읽는다. iOS 는 `GoogleService-Info.plist` + APNs 키 + Apple 개발자 팀 필요(미검증).
 4. `packages/shared` 통합 (위 계획).
-5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 296개.
+5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 389개(2026-10-08 지난 기록 화면 추가 후).
    jest 의 기본 글자 배율(fontScale)은 2 라서 평소 배치를 볼 때는 `testing/fontScale.ts` 의 `setFontScale(1)` 을 쓴다. expo-router·선택기는 `testing/mockRouter.ts`·`testing/mockDateTimePicker.tsx` 로 대체한다.
 6. 운영 API 는 반드시 `https://` 로. 정식(릴리스) 빌드의 안드로이드는 기본적으로 `http://` 통신을 막는다.
 

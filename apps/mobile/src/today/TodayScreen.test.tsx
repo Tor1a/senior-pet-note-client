@@ -186,6 +186,13 @@ describe('오늘 화면 — 조회와 제안값', () => {
 });
 
 describe('오늘 화면 — 약 관리 진입', () => {
+  it('[지난 기록 보기 ›]가 [약 관리 ›] 옆에 있고 지난 기록 화면으로 간다', async () => {
+    setup();
+    await renderToday();
+    await fireEvent.press(screen.getByRole('button', { name: '지난 기록 보기' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/history');
+  });
+
   it('[약 관리 ›]·[약 관리 · 알림 설정]이 약 목록으로 가고, "웹에서 설정해요" 문구는 없다', async () => {
     setup();
     await renderToday();

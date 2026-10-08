@@ -41,6 +41,7 @@ import {
   validateTodayForm,
   type TodayForm,
 } from '../lib/todayForm';
+import { HISTORY_HREF } from '../history/routes';
 import { MEDICATIONS_HREF, NEW_MEDICATION_HREF } from '../medications/routes';
 import { usePet } from '../pet/PetProvider';
 import { usePushMessages } from '../push/pushContext';
@@ -67,6 +68,7 @@ export default function TodayScreen() {
   const params = useLocalSearchParams<{ source?: string; med?: string; n?: string }>();
   const router = useRouter();
   const goManage = useCallback(() => router.push(MEDICATIONS_HREF as never), [router]);
+  const goHistory = useCallback(() => router.push(HISTORY_HREF as never), [router]);
   const goAddMedication = useCallback(() => router.push(NEW_MEDICATION_HREF as never), [router]);
 
   const [today, setToday] = useState<TodayResponse | null>(null);
@@ -450,6 +452,7 @@ export default function TodayScreen() {
             onToggle={(d) => void toggleDose(d)}
             onHighlight={revealCard}
             onManage={goManage}
+            onHistory={goHistory}
             onAdd={goAddMedication}
           />
 

@@ -36,6 +36,8 @@ function RootNavigator() {
         <Stack.Screen name="medications/new" />
         <Stack.Screen name="medications/[id]/edit" />
         <Stack.Screen name="medications/[id]/reminder" />
+        <Stack.Screen name="history/index" />
+        <Stack.Screen name="history/[recordDate]" />
       </Stack.Protected>
       <Stack.Protected guard={!signedIn}>
         <Stack.Screen name="login" />
