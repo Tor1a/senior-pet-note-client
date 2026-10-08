@@ -38,7 +38,10 @@ npm test                          # 단위 테스트 (Vitest)
 # (선택) 배포용 빌드 확인 + 미리보기(서비스워커 동작 확인용)
 npm run build
 npm run preview                   # → http://localhost:4173  (CORS 허용 주소에 4173 도 필요)
+# API 의 기본 CORS 허용 주소(5173)로 확인하려면: npx vite preview --port 5173 --strictPort
 ```
+
+- **웹 푸시 알림은 `npm run dev` 에서는 동작하지 않는다.** 개발 서버는 서비스워커를 등록하지 않아 FCM 토큰을 받을 수 없고, 알림을 켜도 서버에는 "등록된 기기 없음"(`no_device`)으로 남는다. 푸시를 확인하려면 위처럼 빌드 후 미리보기로 연다(`VITE_FIREBASE_*` 는 빌드할 때 들어가므로 `.env.local` 을 먼저 채운다).
 
 - 환경변수는 `VITE_API_BASE_URL` 하나뿐이다. 주소 형식이 틀리면 **"환경변수 설정 필요"** 안내 화면이 뜬다.
 - `VITE_` 로 시작하는 값은 브라우저에 그대로 공개되므로 비밀 값은 넣지 않는다. `.env*` 는 `.gitignore` 로 제외(`.env.example` 만 커밋).
