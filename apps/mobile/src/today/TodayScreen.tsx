@@ -42,6 +42,8 @@ import {
   type TodayForm,
 } from '../lib/todayForm';
 import { HISTORY_HREF } from '../history/routes';
+import { REPORT_TEXT } from '../lib/reportText';
+import { REPORT_HREF } from '../report/routes';
 import { MEDICATIONS_HREF, NEW_MEDICATION_HREF } from '../medications/routes';
 import { usePet } from '../pet/PetProvider';
 import { usePushMessages } from '../push/pushContext';
@@ -69,6 +71,7 @@ export default function TodayScreen() {
   const router = useRouter();
   const goManage = useCallback(() => router.push(MEDICATIONS_HREF as never), [router]);
   const goHistory = useCallback(() => router.push(HISTORY_HREF as never), [router]);
+  const goReport = useCallback(() => router.push(REPORT_HREF as never), [router]);
   const goAddMedication = useCallback(() => router.push(NEW_MEDICATION_HREF as never), [router]);
 
   const [today, setToday] = useState<TodayResponse | null>(null);
@@ -520,6 +523,14 @@ export default function TodayScreen() {
             />
 
             <MemoSection value={form.memo} onChange={(memo) => update({ memo })} />
+
+            <Card>
+              <AppText variant="title" accessibilityRole="header">
+                {REPORT_TEXT.entryCardTitle}
+              </AppText>
+              <AppText>{REPORT_TEXT.entryCardBody}</AppText>
+              <AppButton label={REPORT_TEXT.entryCardButton} variant="secondary" onPress={goReport} />
+            </Card>
 
             <AppText variant="caption">{DISCLAIMER}</AppText>
           </View>

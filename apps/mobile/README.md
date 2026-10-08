@@ -96,6 +96,14 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - **`react-native-svg` 는 네이티브 모듈이라 개발 빌드를 한 번 다시 만들어야 한다**: `export JAVA_HOME=$(/usr/libexec/java_home -v 21)` 후 `CI=1 npx expo run:android`(JDK 25 금지). Expo Go 에는 포함돼 있다고 알려져 있으나 이번에 Expo Go 실기기 구동은 **확인하지 못했다**(푸시 때문에 개발 빌드가 기준).
 - Jest 에서는 `react-native-svg` 를 가벼운 껍데기로 바꿔 쓰고(좌표 계산은 `chartGeometry` 테스트가 보장), 그래프의 실제 그리기는 에뮬레이터에서 눈으로 확인했다.
 
+## 병원 방문 리포트 (2026-10-08)
+- 라우트 `/report`(`src/app/report/index.tsx` -> `src/report/ReportScreen.tsx`, 카드 `ReportCards.tsx`). 오늘 화면 맨 아래 `병원 방문 리포트` 카드의 [리포트 보기], 지난 기록 화면 기간 아래 [병원 방문 리포트 만들기 ›](`?range=7|30&from=history` 로 기간을 이어받고 돌아오기는 지난 기록)에서 들어간다.
+- 신규 API 없음: 지난 기록과 같은 `GET daily-logs`(파라미터 없이 1번) + `GET medications` 로 만들고 7/14/30일(기본 14일) 전환은 화면에서 자른다. 기간·메모 옵션은 저장하지 않는다.
+- 공유 사본: `lib/reportStats.ts`, `lib/reportText.ts`(+ 테스트). 웹 원본을 먼저 고치고 복사한다(헤더 3줄 외 diff 없음). 화면은 모바일 전용.
+- 내보내기는 RN 기본 `Share.share({ message })` **텍스트만**. 새 네이티브 모듈 없음 -> **개발 빌드 재생성 불필요**(JS 변경만). 파일·클립보드·이미지 생성 없음. 공유 전 확인 카드(담기는 내용 미리보기, 메모 포함 스위치 기본 켜짐, "건강 기록이 선택한 앱으로 전달돼요.")를 거친다. 기록 0일이면 공유 비활성 + 이유 글자. Expo 웹 미리보기에서는 공유 대신 `공유는 앱에서 할 수 있어요.`.
+- 큰 글씨: 1.3배 이상 표 행을 세로 배치, 2.0배 이상 또는 스크린리더가 켜져 있으면 날짜별 체중 표가 기본 펼침(그 외 접힘). 그래프는 한 덩어리 접근성 요소(요약 문장) + 아래 표/행 목록이 값을 읽어 준다. 요약 문장은 항상 그래프보다 위.
+- 확인하지 못한 것: 에뮬레이터·실기기에서의 화면/공유 시트 동작(Jest 컴포넌트 테스트와 `expo export --platform web` 번들만 확인), iOS, TalkBack/VoiceOver 실제 읽기 순서.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
@@ -138,7 +146,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 2. 반려동물 등록·선택, 사진 업로드(`expo-image-picker`, MVP 결정 2).
 3. **푸시 알림(투약 알림):** `@react-native-firebase/messaging` 으로 구현됨. 알림 규칙(켜기/끄기·매일/요일/N일 간격·기간)은 앱의 약 관리 → 알림 설정 화면에서 정한다(웹과 같은 기능). 개발 빌드(`npx expo prebuild` + `npx expo run:android`)와 `google-services.json`(앱 루트, git 제외, 패키지명 `com.oraegyeot.seniorpet`)이 필요하다. Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 알림만 꺼진다. 플랫폼별로 따로 판단하며 한쪽 파일만 있으면 경고를 출력하고 그쪽만 켠다. **EAS 클라우드 빌드**는 git 에 없는 설정 파일이 올라가지 않으므로 file secret 으로 넣는다: `eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`(iOS 는 `GOOGLE_SERVICE_INFO_PLIST`). app.config.ts 가 이 환경변수 경로를 읽는다. iOS 는 `GoogleService-Info.plist` + APNs 키 + Apple 개발자 팀 필요(미검증).
 4. `packages/shared` 통합 (위 계획).
-5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 389개(2026-10-08 지난 기록 화면 추가 후).
+5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 546개(2026-10-08 병원 방문 리포트 추가 후).
    jest 의 기본 글자 배율(fontScale)은 2 라서 평소 배치를 볼 때는 `testing/fontScale.ts` 의 `setFontScale(1)` 을 쓴다. expo-router·선택기는 `testing/mockRouter.ts`·`testing/mockDateTimePicker.tsx` 로 대체한다.
 6. 운영 API 는 반드시 `https://` 로. 정식(릴리스) 빌드의 안드로이드는 기본적으로 `http://` 통신을 막는다.
 

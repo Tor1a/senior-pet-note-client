@@ -34,6 +34,8 @@ import {
   weightFactLines,
 } from '../lib/historyText';
 import type { HistoryResponse } from '../lib/petApi';
+import { REPORT_TEXT } from '../lib/reportText';
+import { reportFromHistoryHref } from '../report/routes';
 import { goBackOr } from '../medications/routes';
 import { ScreenTop } from '../medications/ScreenTop';
 import { usePet } from '../pet/PetProvider';
@@ -145,6 +147,13 @@ export default function HistoryScreen() {
           {rangeNotice}
         </AppText>
       )}
+
+      <AppButton
+        label={REPORT_TEXT.historyLink}
+        accessibilityLabel="병원 방문 리포트 만들기"
+        variant="secondary"
+        onPress={() => router.push(reportFromHistoryHref(range === 7 ? 7 : 30) as never)}
+      />
 
       {error && (
         <NoticeCard kind="info" alert>

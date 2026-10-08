@@ -158,6 +158,17 @@ describe('H1 지난 기록 (모바일)', () => {
     expect(screen.getByRole('link', { name: '10월 7일 (수). 기록 없음 · 투약 2/3' })).toBeTruthy();
   });
 
+  it('병원 방문 리포트 만들기: 보던 기간을 이어 리포트로 이동한다', async () => {
+    setup(() => json(200, fullHistory()));
+    await renderScreen();
+    await screen.findByText(/기록한 날/);
+    await fireEvent.press(screen.getByRole('button', { name: '병원 방문 리포트 만들기' }));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/report?range=30&from=history');
+    await fireEvent.press(screen.getByRole('radio', { name: '7일' }));
+    await fireEvent.press(screen.getByRole('button', { name: '병원 방문 리포트 만들기' }));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/report?range=7&from=history');
+  });
+
   it('기록 0일: 전체 빈 상태와 오늘 기록하러 가기', async () => {
     setup(() => json(200, historyFixture(daysFixture(END, 30))));
     await renderScreen();

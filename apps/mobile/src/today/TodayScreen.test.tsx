@@ -193,6 +193,14 @@ describe('오늘 화면 — 약 관리 진입', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/history');
   });
 
+  it('병원 방문 리포트 카드의 [리포트 보기]가 리포트 화면으로 간다', async () => {
+    setup();
+    await renderToday();
+    expect(screen.getByText('진료 때 보여 드릴 한 장 요약이에요.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: '리포트 보기' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/report');
+  });
+
   it('[약 관리 ›]·[약 관리 · 알림 설정]이 약 목록으로 가고, "웹에서 설정해요" 문구는 없다', async () => {
     setup();
     await renderToday();
