@@ -169,6 +169,9 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
         {isNew ? <span className="step">1 / 2</span> : <Link to="/today" className="btn-link">← 오늘로</Link>}
         {!isNew && (
           <div className="logout-box">
+            <Link to="/account" className="btn-link">
+              계정
+            </Link>
             <button
               type="button"
               className="btn-link"

@@ -4,6 +4,7 @@
 //   POST /api/auth/login  {email, password}           → 200 {accessToken, user:{id,email}}
 //   GET  /api/me (Authorization: Bearer <token>)      → 200 {id,email}
 //   오류 본문 {code, message}: 400 VALIDATION_ERROR, 401 UNAUTHORIZED, 409 EMAIL_TAKEN
+//   계정 API(비밀번호 변경·탈퇴): 400 CURRENT_PASSWORD_MISMATCH(401 아님), 429 TOO_MANY_ATTEMPTS(+Retry-After 초)
 //   JWT 만료 7일, refresh 없음 → 만료되면 401 을 받고 다시 로그인한다.
 // 반려동물·투약·오늘 화면 API 는 petApi.ts (계약: docs/api-today.md)
 
@@ -26,13 +27,22 @@ export class ApiError extends Error {
   readonly kind: 'network' | 'http';
   readonly status: number;
   readonly code: string | null;
+  /** 429 의 Retry-After 헤더(초). 없거나 읽을 수 없으면 null */
+  readonly retryAfterSec: number | null;
 
-  constructor(kind: 'network' | 'http', status: number, code: string | null, message: string) {
+  constructor(
+    kind: 'network' | 'http',
+    status: number,
+    code: string | null,
+    message: string,
+    retryAfterSec: number | null = null,
+  ) {
     super(message);
     this.name = 'ApiError';
     this.kind = kind;
     this.status = status;
     this.code = code;
+    this.retryAfterSec = retryAfterSec;
   }
 }
 
@@ -67,6 +77,12 @@ export interface ApiClient {
   signup(email: string, password: string): Promise<AuthResponse>;
   login(email: string, password: string): Promise<AuthResponse>;
   me(): Promise<User>;
+}
+
+/** Retry-After 헤더(초)를 숫자로. 형식이 다르면 null */
+function parseRetryAfter(value: string | null): number | null {
+  if (!value || !/^\d+$/.test(value.trim())) return null;
+  return Number(value.trim());
 }
 
 async function readJson(res: Response): Promise<unknown> {
@@ -121,8 +137,9 @@ export function createApiClient(options: ApiClientOptions): ApiClient {
       const message = typeof err.message === 'string' ? err.message : `HTTP ${res.status}`;
       // 토큰을 붙여 보낸 요청이 401 이면 토큰이 만료·무효인 것 → 로그아웃 처리
       // (로그인 시도 자체의 401 은 "비밀번호 틀림"이므로 로그아웃 처리하지 않는다)
-      if (res.status === 401 && token && !ignoreUnauthorized) onUnauthorized?.();
-      throw new ApiError('http', res.status, code, message);
+      // 단, 응답이 늦게 도착했을 때 그사이 토큰이 바뀌었다면(비밀번호 변경 직후 교체) 옛 토큰의 401 은 무시한다
+      if (res.status === 401 && token && !ignoreUnauthorized && getToken() === token) onUnauthorized?.();
+      throw new ApiError('http', res.status, code, message, parseRetryAfter(res.headers.get('Retry-After')));
     }
     return res;
   }
@@ -161,7 +178,16 @@ export type ErrorContext =
   | 'photo'
   | 'medication'
   | 'medLog'
-  | 'dailyLog';
+  | 'dailyLog'
+  | 'password'
+  | 'withdraw';
+
+/** 429 안내용 기다릴 시간 문구 ("10초", "3분"). 모르면 null */
+export function formatWait(seconds: number | null): string | null {
+  if (seconds === null) return null;
+  if (seconds <= 60) return `${Math.max(1, seconds)}초`;
+  return `${Math.ceil(seconds / 60)}분`;
+}
 
 /**
  * 사용자에게 보여 줄 한국어 오류 문구
@@ -170,6 +196,22 @@ export type ErrorContext =
 export function toUserMessage(err: unknown, context: ErrorContext = 'general'): string {
   if (!(err instanceof ApiError)) return '문제가 생겼어요. 잠시 후 다시 시도해 주세요.';
   if (err.kind === 'network') return NETWORK_ERROR_MESSAGE;
+  // 비밀번호 확인 실패는 400 이다(401 이 아니다) → 로그아웃 처리 없이 폼에 알린다
+  if (err.code === 'CURRENT_PASSWORD_MISMATCH') {
+    return context === 'withdraw'
+      ? '비밀번호가 맞지 않아요. 다시 확인해 주세요.'
+      : '현재 비밀번호가 맞지 않아요. 다시 확인해 주세요.';
+  }
+  if (err.status === 429 || err.code === 'TOO_MANY_ATTEMPTS') {
+    const wait = formatWait(err.retryAfterSec);
+    return wait
+      ? `비밀번호를 여러 번 틀렸어요. ${wait} 뒤에 다시 시도해 주세요.`
+      : '비밀번호를 여러 번 틀렸어요. 잠시 뒤에 다시 시도해 주세요.';
+  }
+  // 같은 계정의 비밀번호 변경이 동시에 겹친 경우(409). 로그아웃하지 않고 잠시 뒤 다시 시도하게 한다
+  if (err.code === 'PASSWORD_CHANGE_CONFLICT') {
+    return '다른 곳에서 비밀번호를 바꾸는 중이에요. 잠시 뒤에 다시 시도해 주세요.';
+  }
   if (err.code === 'EMAIL_TAKEN') return '이미 가입된 이메일이에요. 로그인해 주세요.';
   if (err.status === 401) {
     return context === 'login'
@@ -196,6 +238,8 @@ export function toUserMessage(err: unknown, context: ErrorContext = 'general'): 
         return '입력한 내용을 확인해 주세요. 약 이름은 1~50자, 시각은 1~3개이고 서로 달라야 해요.';
       case 'medLog':
         return '약 일정이 바뀐 것 같아요. 화면을 새로 불러왔어요.';
+      case 'password':
+        return '새 비밀번호를 사용할 수 없어요. 8자 이상(한글은 24자까지)으로, 지금 쓰는 것과 다르게 다시 정해 주세요.';
       case 'dailyLog':
         return '입력한 내용을 확인해 주세요. 체중은 0보다 크고 200kg보다 작게, 물은 0~20000ml로 적을 수 있어요.';
       default:

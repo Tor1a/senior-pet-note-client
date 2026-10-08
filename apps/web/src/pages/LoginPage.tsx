@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../auth';
 import { toUserMessage } from '../lib/api';
 import { DISCLAIMER } from '../lib/constants';
@@ -12,7 +12,8 @@ import {
 
 // 이메일 + 비밀번호 로그인 / 회원가입 화면 (Java 백엔드 /api/auth/*)
 export default function LoginPage() {
-  const { login, signup } = useAuth();
+  const { login, signup, farewell, clearFarewell } = useAuth();
+  const farewellRef = useRef<HTMLDivElement>(null);
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -23,7 +24,13 @@ export default function LoginPage() {
 
   const isSignup = mode === 'signup';
 
+  // 탈퇴 직후에는 완료 안내로 포커스를 옮긴다(스크린리더가 먼저 읽는다)
+  useEffect(() => {
+    if (farewell) farewellRef.current?.focus();
+  }, [farewell]);
+
   function switchMode(next: AuthMode) {
+    clearFarewell();
     setMode(next);
     setFieldErrors({});
     setFormError(null);
@@ -54,6 +61,16 @@ export default function LoginPage() {
     <main className="page">
       <h1>시니어펫 노트</h1>
       <p className="lead">매일 10초 기록, 진료 때 1장 리포트</p>
+
+      {farewell && (
+        <div ref={farewellRef} tabIndex={-1} role="status" className="ok farewell">
+          <strong>탈퇴가 끝났어요.</strong>
+          <br />
+          계정과 기록을 모두 지웠어요.
+          <br />
+          이용해 주셔서 감사합니다.
+        </div>
+      )}
 
       <form onSubmit={onSubmit} className="card" noValidate>
         <h2>{isSignup ? '회원가입' : '로그인'}</h2>

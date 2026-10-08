@@ -607,6 +607,10 @@ export default function TodayPage() {
                 <span>{HISTORY_TEXT.entryLink}</span>
               </Link>
 
+              <Link to="/account" className="history-link-row">
+                <span>계정 · 로그아웃</span>
+              </Link>
+
               <p className="disclaimer">{DISCLAIMER}</p>
             </div>
           </>

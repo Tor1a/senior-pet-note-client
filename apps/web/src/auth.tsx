@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError, type User } from './lib/api';
 import { api, UNAUTHORIZED_EVENT } from './lib/client';
 import { clearToken, getToken, setToken } from './lib/tokenStorage';
+import { clearLocalAppData } from './lib/localData';
 import { releaseWebDevice } from './push/device';
 
 // 로그인 상태를 앱 전체에 공유한다.
@@ -19,6 +20,13 @@ interface AuthContextValue {
   signup: (email: string, password: string) => Promise<void>;
   /** 이 기기 알림 해제(최대 3초)를 기다린 뒤 로그아웃한다 */
   logout: () => Promise<void>;
+  /** 비밀번호 변경 성공: 응답의 새 토큰으로 즉시 교체한다(이전 토큰은 모두 401 이 된다). 로그인은 유지 */
+  replaceToken: (accessToken: string) => void;
+  /** 탈퇴 204 후: 서버 기기 해제 없이 기기·토큰·로컬 정리 → 로그인 화면(탈퇴 안내 포함) */
+  finishWithdrawal: () => Promise<void>;
+  /** 로그인 화면에 탈퇴 완료 안내를 보일지 */
+  farewell: boolean;
+  clearFarewell: () => void;
   /** 서버 연결 실패 후 다시 세션 확인 */
   retry: () => void;
 }
@@ -29,6 +37,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<AuthStatus>(() => (getToken() ? 'loading' : 'signedOut'));
   const [user, setUser] = useState<User | null>(null);
+  const [farewell, setFarewell] = useState(false);
 
   const checkSession = useCallback(async () => {
     if (!getToken()) {
@@ -79,12 +88,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       user,
       login: async (email, password) => {
         const res = await api.login(email, password);
+        setFarewell(false);
         setToken(res.accessToken);
         setUser(res.user);
         setStatus('signedIn');
       },
       signup: async (email, password) => {
         const res = await api.signup(email, password);
+        setFarewell(false);
         setToken(res.accessToken);
         setUser(res.user);
         setStatus('signedIn');
@@ -98,9 +109,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('signedOut');
         navigate('/login', { replace: true });
       },
+      replaceToken: (accessToken) => setToken(accessToken),
+      finishWithdrawal: async () => {
+        // 계정이 이미 없어 서버 DELETE 는 못 한다 → Firebase 토큰과 로컬 기기 id 만 정리(최대 3초)
+        await releaseWebDevice(false);
+        clearToken();
+        clearLocalAppData();
+        setUser(null);
+        setFarewell(true);
+        setStatus('signedOut');
+        navigate('/login', { replace: true });
+      },
+      farewell,
+      clearFarewell: () => setFarewell(false),
       retry: () => void checkSession(),
     }),
-    [status, user, navigate, checkSession],
+    [status, user, farewell, navigate, checkSession],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

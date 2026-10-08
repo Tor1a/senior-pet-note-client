@@ -1,6 +1,7 @@
 import { createApiClient } from './api';
 import { createPetApi } from './petApi';
 import { createReminderApi } from './reminderApi';
+import { createAccountApi } from './accountApi';
 import { apiConfig, DEFAULT_API_BASE_URL } from './config';
 import { clearToken, getToken } from './tokenStorage';
 
@@ -25,3 +26,6 @@ export const petApi = createPetApi(api);
 
 /** 투약 알림 설정·기기 토큰 API (계약: docs/api-reminders.md) */
 export const reminderApi = createReminderApi(api);
+
+/** 비밀번호 변경·회원 탈퇴 API (계약: docs/api-account.md) */
+export const accountApi = createAccountApi(api);

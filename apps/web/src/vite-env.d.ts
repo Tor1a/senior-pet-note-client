@@ -5,6 +5,8 @@
 interface ImportMetaEnv {
   /** Java 백엔드 API 주소. 비어 있으면 http://localhost:8080 을 쓴다 */
   readonly VITE_API_BASE_URL?: string;
+  /** 개인정보 처리방침 주소(http/https). 비어 있으면 계정·탈퇴 화면의 링크 줄을 숨긴다 */
+  readonly VITE_PRIVACY_POLICY_URL?: string;
   /** Firebase 웹 앱 설정값 (투약 알림). 다섯 개 중 하나라도 비면 알림 기능만 꺼진다 */
   readonly VITE_FIREBASE_API_KEY?: string;
   /** 백엔드 서비스 계정과 같은 Firebase 프로젝트여야 한다 */

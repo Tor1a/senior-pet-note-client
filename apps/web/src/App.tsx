@@ -10,6 +10,9 @@ import MedicationsPage from './pages/MedicationsPage';
 import ReminderPage from './pages/ReminderPage';
 import HistoryPage from './pages/HistoryPage';
 import HistoryDayPage from './pages/HistoryDayPage';
+import AccountPage from './pages/AccountPage';
+import PasswordChangePage from './pages/PasswordChangePage';
+import AccountDeletePage from './pages/AccountDeletePage';
 import { PushProvider } from './push/PushProvider';
 import SetupNeededPage from './pages/SetupNeededPage';
 import ServerDownPage from './pages/ServerDownPage';
@@ -22,6 +25,7 @@ import ServerDownPage from './pages/ServerDownPage';
 //   /history     : 지난 기록 보기(7일/30일, 체중 그래프)
 //   /history/:recordDate : 하루 상세(읽기 전용)
 //   /pet         : 프로필 수정(사진 교체·삭제, 로그아웃)
+//   /account, /account/password, /account/delete : 계정 · 비밀번호 바꾸기 · 회원 탈퇴 (반려동물이 없어도 열린다)
 //   /today       : "오늘" 기록 화면 (알림을 눌러 열면 ?source=push)
 //   로그인 안 됨 → /login, 반려동물 없음 → /pets/new
 //   로그인한 화면은 PushProvider 안에 있다(이 기기 알림 상태, 기기 등록, 포그라운드 배너)
@@ -58,6 +62,9 @@ export default function App() {
             </PetGate>
           }
         />
+        <Route path="/account" element={<AccountPage />} />
+        <Route path="/account/password" element={<PasswordChangePage />} />
+        <Route path="/account/delete" element={<AccountDeletePage />} />
         <Route
           path="/pet"
           element={
