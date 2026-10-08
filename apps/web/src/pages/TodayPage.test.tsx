@@ -513,3 +513,13 @@ describe('오늘 화면 — 푸시로 열었을 때(S9)', () => {
     expect(screen.queryByText('방금 알림 온 약')).toBeNull();
   });
 });
+
+describe('오늘 화면 — 지난 기록 진입', () => {
+  it('상단 바로가기와 아래쪽 링크 행이 /history 로 이어진다', async () => {
+    mockServer({ 'GET /api/pets/pet-1/today': () => json(200, todayExample()) });
+    renderToday();
+    await screen.findByText('새벽 4시 전 투약은 전날 기록으로 저장돼요');
+    expect(screen.getByRole('link', { name: '지난 기록' }).getAttribute('href')).toBe('/history');
+    expect(screen.getByRole('link', { name: '지난 기록 보기 ›' }).getAttribute('href')).toBe('/history');
+  });
+});

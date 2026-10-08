@@ -4,6 +4,7 @@ import PetAvatar from '../components/PetAvatar';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
+import { HISTORY_TEXT } from '../lib/historyText';
 import { daysBetween, formatKg, formatRecordDate, LEVEL_LABELS, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
 import {
@@ -325,9 +326,14 @@ export default function TodayPage() {
       <header className="today-header">
         <div className="row-between">
           <p className="today-date">{today ? formatRecordDate(today.recordDate) : '오늘'}</p>
-          <Link to="/pet" className="btn-link menu-link" aria-label="메뉴: 프로필과 약 관리">
-            ≡ 메뉴
-          </Link>
+          <nav className="top-links" aria-label="바로가기">
+            <Link to="/history" className="btn-link menu-link">
+              지난 기록
+            </Link>
+            <Link to="/pet" className="btn-link menu-link" aria-label="메뉴: 프로필과 약 관리">
+              ≡ 메뉴
+            </Link>
+          </nav>
         </div>
         <div className="pet-line">
           <PetAvatar pet={pet} size={40} />
@@ -596,6 +602,10 @@ export default function TodayPage() {
                   {form.memo.length} / {MEMO_MAX_LENGTH}
                 </p>
               </section>
+
+              <Link to="/history" className="history-link-row">
+                <span>{HISTORY_TEXT.entryLink}</span>
+              </Link>
 
               <p className="disclaimer">{DISCLAIMER}</p>
             </div>

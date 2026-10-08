@@ -93,6 +93,30 @@ export interface MedLog {
   takenAt: string;
 }
 
+/** 지난 기록 보기 (계약: docs/api-history.md). 투약 횟수는 "현재 등록된 약 기준" 환산값 */
+export interface HistoryMedication {
+  scheduledCount: number;
+  takenCount: number;
+}
+
+export interface HistoryDay {
+  recordDate: string;
+  /** 그날 기록이 없으면 null (0이나 "보통"으로 채우지 않는다) */
+  dailyLog: DailyLog | null;
+  medication: HistoryMedication;
+}
+
+export interface HistoryResponse {
+  petId: string;
+  from: string;
+  to: string;
+  /** 서버의 현재 기록 날짜 ("오늘(기록 중)" 판단에 쓴다) */
+  recordDate: string;
+  medicationBasis: 'current';
+  /** from~to 모든 날짜가 오름차순으로 빠짐없이 들어 있다 */
+  days: HistoryDay[];
+}
+
 /** MVP 허용 이벤트 이름 (계약 6장) */
 export type EventName = 'today_opened' | 'med_checked' | 'daily_log_saved';
 
@@ -125,6 +149,15 @@ export function createPetApi(client: ApiClient) {
     uncheckMed: (medLogId: string) => client.request<null>(`/api/med-logs/${enc(medLogId)}`, { method: 'DELETE' }),
     saveDailyLog: (petId: string, recordDate: string, body: DailyLogBody) =>
       client.request<DailyLog>(`/api/pets/${enc(petId)}/daily-logs/${enc(recordDate)}`, { method: 'PUT', body }),
+
+    /** 기간별 일일 기록. 기본은 파라미터 없이(서버가 "오늘"과 30일을 정한다). 하루 상세는 from=to=날짜 */
+    getHistory: (petId: string, range: { from?: string; to?: string } = {}) => {
+      const query = new URLSearchParams();
+      if (range.from) query.set('from', range.from);
+      if (range.to) query.set('to', range.to);
+      const qs = query.toString();
+      return client.request<HistoryResponse>(`/api/pets/${enc(petId)}/daily-logs${qs ? `?${qs}` : ''}`);
+    },
 
     /**
      * 지표 이벤트. 실패해도(서버 꺼짐·401·400) 화면에 영향이 없도록 오류를 삼킨다.

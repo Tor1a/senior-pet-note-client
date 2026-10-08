@@ -8,6 +8,8 @@ import TodayPage from './pages/TodayPage';
 import PetFormPage from './pages/PetFormPage';
 import MedicationsPage from './pages/MedicationsPage';
 import ReminderPage from './pages/ReminderPage';
+import HistoryPage from './pages/HistoryPage';
+import HistoryDayPage from './pages/HistoryDayPage';
 import { PushProvider } from './push/PushProvider';
 import SetupNeededPage from './pages/SetupNeededPage';
 import ServerDownPage from './pages/ServerDownPage';
@@ -17,6 +19,8 @@ import ServerDownPage from './pages/ServerDownPage';
 //   /pets/new    : 반려동물 등록 (온보딩 1/2). 이미 있으면 /today 로
 //   /medications : 약 관리 (온보딩 2/2 이면 ?onboarding=1, 약 고치기 폼 바로 열기 ?edit=<약 id>)
 //   /medications/:id/reminder : 투약 알림 설정
+//   /history     : 지난 기록 보기(7일/30일, 체중 그래프)
+//   /history/:recordDate : 하루 상세(읽기 전용)
 //   /pet         : 프로필 수정(사진 교체·삭제, 로그아웃)
 //   /today       : "오늘" 기록 화면 (알림을 눌러 열면 ?source=push)
 //   로그인 안 됨 → /login, 반려동물 없음 → /pets/new
@@ -75,6 +79,22 @@ export default function App() {
           element={
             <PetGate need="ready">
               <ReminderPage />
+            </PetGate>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <PetGate need="ready">
+              <HistoryPage />
+            </PetGate>
+          }
+        />
+        <Route
+          path="/history/:recordDate"
+          element={
+            <PetGate need="ready">
+              <HistoryDayPage />
             </PetGate>
           }
         />
