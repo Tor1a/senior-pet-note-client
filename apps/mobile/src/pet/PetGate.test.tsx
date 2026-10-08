@@ -75,3 +75,21 @@ it('이미 ready 일 때 reload 가 돌아도 오늘 화면을 언마운트하�
   });
   expect(screen.getByText('오늘 화면')).toBeTruthy();
 });
+
+it('안내 화면 제목을 화면마다 정할 수 있고(기본 "오늘"), 안내 화면에는 약 관리 버튼이 없다', async () => {
+  global.fetch = jest.fn(async () => json(200, [])) as never;
+  const { unmount } = await render(
+    <PetProvider>
+      <PetGate title="먹이는 약">
+        <Text>약 목록</Text>
+      </PetGate>
+    </PetProvider>,
+  );
+  await screen.findByText('웹에서 반려동물을 먼저 등록해 주세요');
+  expect(screen.getByText('먹이는 약')).toBeTruthy();
+  expect(screen.queryByRole('button', { name: '약 관리 · 알림 설정' })).toBeNull();
+  await unmount();
+  await render(ui());
+  await screen.findByText('웹에서 반려동물을 먼저 등록해 주세요');
+  expect(screen.getByText('오늘')).toBeTruthy();
+});

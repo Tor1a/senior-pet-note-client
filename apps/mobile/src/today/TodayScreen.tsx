@@ -2,7 +2,7 @@
 // - 기록 날짜·제안값·새벽 4시 안내 문구는 서버(GET /today)가 준 값을 그대로 쓴다. 클라이언트는 날짜를 계산하지 않는다.
 // - 투약 체크는 탭 즉시 저장(낙관적 업데이트), 일일 기록은 [저장]을 눌러야 확정한다.
 // - 모바일에서 더한 것: 앱이 앞으로 돌아왔을 때 재동기(날짜가 바뀌었으면 화면 교체), 당겨서 새로고침(투약만).
-import { useLocalSearchParams } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, AppState, findNodeHandle, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { AppButton, AppText, Card, Screen } from '../components/ui';
@@ -41,6 +41,7 @@ import {
   validateTodayForm,
   type TodayForm,
 } from '../lib/todayForm';
+import { MEDICATIONS_HREF, NEW_MEDICATION_HREF } from '../medications/routes';
 import { usePet } from '../pet/PetProvider';
 import { usePushMessages } from '../push/pushContext';
 import { petApi } from '../services/client';
@@ -64,6 +65,9 @@ export const DATE_CHANGED_NOTICE = '새 날짜가 되어 화면을 새로 불러
 export default function TodayScreen() {
   const { pet, reload: reloadPet } = usePet();
   const params = useLocalSearchParams<{ source?: string; med?: string; n?: string }>();
+  const router = useRouter();
+  const goManage = useCallback(() => router.push(MEDICATIONS_HREF as never), [router]);
+  const goAddMedication = useCallback(() => router.push(NEW_MEDICATION_HREF as never), [router]);
 
   const [today, setToday] = useState<TodayResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -156,6 +160,18 @@ export default function TodayScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // 약 관리 화면에서 약을 등록·삭제하고 돌아오면 투약 목록을 서버와 다시 맞춘다(첫 진입은 load 가 읽는다)
+  const focusedOnce = useRef(false);
+  useFocusEffect(
+    useCallback(() => {
+      if (!focusedOnce.current) {
+        focusedOnce.current = true;
+        return;
+      }
+      void syncDoses();
+    }, [syncDoses]),
+  );
 
   // 화면을 보고 있을 때 투약 알림이 오면(배너는 PushProvider 가 그린다) 투약 상태를 서버와 다시 맞춘다
   usePushMessages(() => {
@@ -433,6 +449,8 @@ export default function TodayScreen() {
             highlightKey={highlightKey}
             onToggle={(d) => void toggleDose(d)}
             onHighlight={revealCard}
+            onManage={goManage}
+            onAdd={goAddMedication}
           />
 
           {/* 투약 카드가 접히는 동안 아래 영역 입력을 잠시 막는다 */}
@@ -505,7 +523,7 @@ export default function TodayScreen() {
         </>
       )}
 
-      <DeviceFooter />
+      <DeviceFooter onManage={goManage} />
     </Screen>
   );
 }

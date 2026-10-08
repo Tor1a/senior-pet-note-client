@@ -5,6 +5,14 @@ import type { MedReminderData } from '../lib/reminderApi';
 
 export type PushDeviceState = 'checking' | 'unavailable' | 'default' | 'denied' | 'registering' | 'registered' | 'error';
 
+/**
+ * 이 기기가 알림을 받을 수 없는 상태인지(약 목록 상태 줄 2줄째, 저장 후 안내 문구에 쓴다).
+ * 웹 PushProvider 의 같은 이름 함수와 같은 정의지만 상태 집합이 달라 사본이 아니라 플랫폼 코드다.
+ */
+export function cannotReceive(state: PushDeviceState): boolean {
+  return state !== 'registered' && state !== 'registering' && state !== 'checking';
+}
+
 /** 포그라운드에서 받은 투약 알림 (웹 PushBannerMessage 와 같은 모양) */
 export interface PushBannerMessage extends MedReminderData {
   key: string;

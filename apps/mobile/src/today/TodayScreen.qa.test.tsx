@@ -9,7 +9,20 @@ import TodayScreen from './TodayScreen';
 jest.mock('../services/client', () => require('../testing/mockClient'));
 jest.mock('../services/preferences', () => ({ readPreferMl: async () => false, writePreferMl: async () => {} }));
 let mockParams: Record<string, string> = {};
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => mockParams, usePathname: () => '/', useRouter: () => ({ replace: jest.fn() }) }));
+const mockPush = jest.fn();
+// 화면이 처음 보일 때 한 번 실행하고, mockRefocus() 로 "다른 화면에 다녀온" 재포커스를 흉내 낸다
+let mockFocusCb: (() => void) | null = null;
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => mockParams,
+  usePathname: () => '/',
+  useRouter: () => ({ replace: jest.fn(), push: mockPush }),
+  useFocusEffect: (cb: () => void) => {
+    require('react').useEffect(() => {
+      mockFocusCb = cb;
+      return cb();
+    }, [cb]);
+  },
+}));
 jest.mock('../auth/AuthContext', () => ({ useAuth: () => ({ signOut: jest.fn() }) }));
 
 type Req = { url: string; method: string; body: any };

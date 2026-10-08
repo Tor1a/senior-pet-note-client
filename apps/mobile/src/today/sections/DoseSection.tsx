@@ -1,9 +1,10 @@
 // 투약 섹션: "오늘 먹일 약 n / m", 카드(대기·접힘·강조), 오류 문구 (웹 TodayPage 투약 영역과 같은 문구)
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
-import { AppText, Card } from '../../components/ui';
+import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AppButton, AppText, Card } from '../../components/ui';
 import { doseKey, doseLabel, doseParts, type DoseView } from '../../lib/todayDoses';
 import { colors, spacing, touch } from '../../theme';
+import { isLargeFont } from '../../medications/layout';
 
 interface DoseSectionProps {
   doses: DoseView[];
@@ -13,9 +14,13 @@ interface DoseSectionProps {
   onToggle: (dose: DoseView) => void;
   /** 강조된 카드가 생기면 화면이 그 위치로 스크롤·포커스를 옮긴다 */
   onHighlight: (node: View) => void;
+  /** 약 관리 화면으로(약 카드를 누르면 체크라서 카드 밖에 별도 버튼으로 둔다) */
+  onManage: () => void;
+  /** 약 등록 화면으로(약이 하나도 없을 때) */
+  onAdd: () => void;
 }
 
-export function DoseSection({ doses, cutoffNotice, message, highlightKey, onToggle, onHighlight }: DoseSectionProps) {
+export function DoseSection({ doses, cutoffNotice, message, highlightKey, onToggle, onHighlight, onManage, onAdd }: DoseSectionProps) {
   const takenCount = doses.filter((d) => d.taken).length;
   return (
     <View style={styles.section}>
@@ -28,7 +33,8 @@ export function DoseSection({ doses, cutoffNotice, message, highlightKey, onTogg
       {doses.length === 0 ? (
         <Card>
           <AppText style={styles.bold}>먹이는 약이 있나요?</AppText>
-          <AppText variant="secondary">약은 웹에서 등록해요. 등록하면 여기서 한 번에 체크할 수 있어요.</AppText>
+          <AppText variant="secondary">등록하면 여기서 한 번에 체크할 수 있어요.</AppText>
+          <AppButton label="약 등록하기" variant="secondary" onPress={onAdd} />
         </Card>
       ) : (
         <>
@@ -46,6 +52,7 @@ export function DoseSection({ doses, cutoffNotice, message, highlightKey, onTogg
           ))}
         </>
       )}
+      {doses.length > 0 && <AppButton label="약 관리 ›" accessibilityLabel="약 관리" variant="secondary" onPress={onManage} />}
       {message && (
         <AppText accessibilityRole="alert" accessibilityLiveRegion="polite" style={styles.bold}>
           {`! ${message}`}
@@ -74,6 +81,8 @@ function DoseItem({
   }, [highlight]);
 
   const { what, time, takenText } = doseParts(dose);
+  // 큰 글씨(1.3~)에서는 이름과 용량을 줄 단위로 나눠 "1 / 정"처럼 단어 중간에서 끊기지 않게 한다
+  const stacked = isLargeFont(useWindowDimensions().fontScale) && !!dose.doseText;
   const a11y = {
     accessibilityRole: 'checkbox' as const,
     accessibilityLabel: highlight ? `방금 알림 온 약, ${doseLabel(dose)}` : doseLabel(dose),
@@ -84,7 +93,15 @@ function DoseItem({
     return (
       <Pressable ref={ref} {...a11y} onPress={onToggle} style={[styles.collapsed]}>
         <AppText style={[styles.check, { color: colors.done }]}>✓</AppText>
-        <AppText style={styles.collapsedLine}>{`${time} ${what} · ${takenText}`}</AppText>
+        {stacked ? (
+          <View style={styles.collapsedLine}>
+            <AppText>{`${time} ${dose.name}`}</AppText>
+            <AppText>{dose.doseText}</AppText>
+            <AppText>{takenText}</AppText>
+          </View>
+        ) : (
+          <AppText style={styles.collapsedLine}>{`${time} ${what} · ${takenText}`}</AppText>
+        )}
         <AppText variant="secondary" style={styles.bold}>
           취소
         </AppText>
@@ -111,7 +128,14 @@ function DoseItem({
         </View>
         <View style={styles.doseBody}>
           <AppText style={styles.bold}>{time}</AppText>
-          <AppText>{what}</AppText>
+          {stacked ? (
+            <>
+              <AppText>{dose.name}</AppText>
+              <AppText>{dose.doseText}</AppText>
+            </>
+          ) : (
+            <AppText>{what}</AppText>
+          )}
         </View>
         <AppText style={styles.bold}>{dose.taken ? takenText : '먹였어요'}</AppText>
       </Pressable>

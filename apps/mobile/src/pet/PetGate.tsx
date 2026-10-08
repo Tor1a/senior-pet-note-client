@@ -7,7 +7,8 @@ import { DeviceFooter } from '../today/sections/DeviceFooter';
 import { colors, spacing } from '../theme';
 import { usePet } from './PetProvider';
 
-export function PetGate({ children }: { children: ReactNode }) {
+/** title: 반려동물이 없거나 불러오지 못했을 때 안내 화면의 제목(기본 "오늘"). 약 관리 화면은 "먹이는 약" */
+export function PetGate({ children, title = '오늘' }: { children: ReactNode; title?: string }) {
   const { status, reload } = usePet();
 
   if (status === 'ready') return <>{children}</>;
@@ -30,7 +31,7 @@ export function PetGate({ children }: { children: ReactNode }) {
   return (
     <Screen>
       <AppText variant="title" accessibilityRole="header">
-        오늘
+        {title}
       </AppText>
       <Card>
         {status === 'none' ? (

@@ -4,7 +4,7 @@
 // - Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 state 가 'unavailable' 이고 아무 일도 하지 않는다.
 import { usePathname, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton, AppText } from '../components/ui';
 import { formatTime } from '../lib/format';
@@ -87,12 +87,33 @@ export function PushProvider({ children }: { children: ReactNode }) {
     void recheck();
   }, [recheck]);
 
+  // 휴대폰 설정에서 알림을 허용하고 앱으로 돌아오면 다시 확인한다(약 관리의 [설정 열기] 흐름).
+  // default/denied/error 일 때만 확인한다. registered 면 이미 등록돼 있어 기기 등록(PUT)을 또 보내지 않는다.
+  // 확인은 권한 조회뿐이라(허용된 경우에만 등록) 짧은 간격으로 돌아와도 부담이 없고, 겹치면 recheck 가 한 번으로 합친다.
+  useEffect(() => {
+    if (!push.available) return;
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next !== 'active') return;
+      const s = stateRef.current;
+      if (s === 'default' || s === 'denied' || s === 'error') void recheck();
+    });
+    return () => sub.remove();
+  }, [recheck]);
+
+  // 오늘 화면으로 이동. replace 로는 약 관리 스택(목록·폼·알림 설정)이 그 아래 남아 뒤로가기로 되살아나므로,
+  // 스택 맨 아래의 오늘 화면까지 되돌아가며(POP_TO, 한 번의 이동) 알림 파라미터를 싣는다.
+  // 저장 안 한 알림 설정이 있으면 그 화면의 이탈 확인 카드가 먼저 뜬다(의도).
+  const goToday = useCallback(
+    (medicationId?: string) => router.dismissTo(todayPushHref(medicationId, nextOpenNonce()) as never),
+    [router],
+  );
+
   // 토큰 갱신 → 다시 PUT, 포그라운드 알림 → 배너, 알림 탭 → 오늘 화면
   useEffect(() => {
     if (!push.available) return;
     const openToday = (msg: PushMessage) => {
       const data = parseMedReminderData(msg.data);
-      if (data) router.replace(todayPushHref(data.medicationId, nextOpenNonce()) as never);
+      if (data) goToday(data.medicationId);
     };
     const offs = [
       push.onTokenRefresh(() => void recheck()),
@@ -112,7 +133,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
     ];
     void push.getInitial().then((msg) => msg && openToday(msg));
     return () => offs.forEach((off) => off());
-  }, [recheck, router]);
+  }, [recheck, goToday]);
 
   const subscribe = useCallback((listener: (m: PushBannerMessage) => void) => {
     listeners.current.add(listener);
@@ -140,7 +161,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
           onOpenToday={() => {
             const last = messages[messages.length - 1];
             setMessages([]);
-            router.replace(todayPushHref(last?.medicationId, nextOpenNonce()) as never);
+            goToday(last?.medicationId);
           }}
         />
       )}

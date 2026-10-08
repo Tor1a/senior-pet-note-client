@@ -137,6 +137,8 @@ interface ChoiceButtonProps {
   prefix?: string;
   /** 다른 값으로 바뀌었을 때 늘어나지 않게 flex 비율 */
   grow?: boolean;
+  /** 높이 56(라디오 행·요일 칸처럼 눌러야 할 일이 많은 칸) */
+  tall?: boolean;
 }
 
 /** 3단 버튼·증상 태그·토글. 선택=채움+✓, 제안=점선+"최근 평균", 최소 48 */
@@ -150,6 +152,7 @@ export function ChoiceButton({
   disabled,
   prefix = '',
   grow,
+  tall,
 }: ChoiceButtonProps) {
   return (
     <Pressable
@@ -161,6 +164,7 @@ export function ChoiceButton({
       style={({ pressed }) => [
         styles.choice,
         grow && styles.choiceGrow,
+        tall && styles.choiceTall,
         suggested && styles.choiceSuggested,
         selected && styles.choiceSelected,
         (pressed || disabled) && styles.buttonDimmed,
@@ -247,14 +251,49 @@ export function AppButton({
   );
 }
 
+/** 링크처럼 보이는 버튼(밑줄 글자, 높이 48). 지우는 동작·"나중에"·뒤로 가기처럼 주요 버튼보다 덜 눈에 띄어야 할 때 */
+export function LinkButton({
+  label,
+  onPress,
+  accessibilityLabel,
+  accessibilityHint,
+  disabled,
+  center,
+}: {
+  label: string;
+  onPress: () => void;
+  accessibilityLabel?: string;
+  accessibilityHint?: string;
+  disabled?: boolean;
+  /** 기본은 왼쪽 정렬 */
+  center?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityHint={accessibilityHint}
+      accessibilityState={{ disabled: !!disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      hitSlop={4}
+      style={({ pressed }) => [styles.link, center && styles.linkCenter, (pressed || disabled) && styles.buttonDimmed]}
+    >
+      <Text style={[styles.body, styles.linkLabel]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 /** 라벨 + 입력칸 + 오류 문구. 오류는 색만이 아니라 글자로도 알린다. */
 export function TextField({
   label,
   error,
   onFocus,
+  inputRef,
   ...inputProps
-}: TextInputProps & { label: string; error?: string }) {
-  const ref = useRef<TextInput>(null);
+}: TextInputProps & { label: string; error?: string; inputRef?: RefObject<TextInput | null> }) {
+  const ownRef = useRef<TextInput>(null);
+  const ref = inputRef ?? ownRef;
   const reveal = useContext(RevealInputContext);
   return (
     <View style={styles.field}>
@@ -317,10 +356,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   choiceGrow: { flexGrow: 1, flexBasis: 0 },
+  choiceTall: { minHeight: touch.primaryHeight },
   choiceSuggested: { borderStyle: 'dashed', backgroundColor: colors.background },
   choiceSelected: { backgroundColor: colors.primary, borderColor: colors.primary, borderStyle: 'solid' },
   choiceLabel: { fontWeight: '700', textAlign: 'center' },
   buttonLabel: { fontWeight: '700', textAlign: 'center' },
+  link: {
+    minHeight: touch.minSize,
+    minWidth: touch.minSize,
+    alignSelf: 'flex-start',
+    justifyContent: 'center',
+  },
+  linkCenter: { alignSelf: 'center' },
+  linkLabel: { fontWeight: '700', textDecorationLine: 'underline' },
   field: { gap: 4 },
   fieldLabel: { fontWeight: '700' },
   input: {

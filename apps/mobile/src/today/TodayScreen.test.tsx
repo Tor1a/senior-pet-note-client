@@ -8,7 +8,20 @@ import TodayScreen, { DATE_CHANGED_NOTICE } from './TodayScreen';
 jest.mock('../services/client', () => require('../testing/mockClient'));
 jest.mock('../services/preferences', () => ({ readPreferMl: async () => false, writePreferMl: async () => {} }));
 let mockParams: Record<string, string> = {};
-jest.mock('expo-router', () => ({ useLocalSearchParams: () => mockParams, usePathname: () => '/', useRouter: () => ({ replace: jest.fn() }) }));
+const mockPush = jest.fn();
+// 화면이 처음 보일 때 한 번 실행하고, mockRefocus() 로 "다른 화면에 다녀온" 재포커스를 흉내 낸다
+let mockFocusCb: (() => void) | null = null;
+jest.mock('expo-router', () => ({
+  useLocalSearchParams: () => mockParams,
+  usePathname: () => '/',
+  useRouter: () => ({ replace: jest.fn(), push: mockPush }),
+  useFocusEffect: (cb: () => void) => {
+    require('react').useEffect(() => {
+      mockFocusCb = cb;
+      return cb();
+    }, [cb]);
+  },
+}));
 jest.mock('../auth/AuthContext', () => ({ useAuth: () => ({ signOut: jest.fn() }) }));
 
 type Handler = (req: { url: string; method: string; body: unknown }) => Response | Promise<Response | undefined> | undefined;
@@ -63,6 +76,7 @@ beforeEach(() => {
   mockParams = {};
   pushListeners = new Set();
   reloadPet.mockClear();
+  mockPush.mockClear();
   jest.spyOn(AppState, 'addEventListener').mockImplementation(((_: string, cb: (s: string) => void) => {
     appStateHandler = cb;
     return { remove: jest.fn() };
@@ -162,8 +176,42 @@ describe('오늘 화면 — 조회와 제안값', () => {
       </PetContext.Provider>,
     );
     await screen.findByText('보리와의 첫 기록을 시작해 볼까요?');
-    expect(screen.getByText('약은 웹에서 등록해요. 등록하면 여기서 한 번에 체크할 수 있어요.')).toBeTruthy();
+    expect(screen.getByText('등록하면 여기서 한 번에 체크할 수 있어요.')).toBeTruthy();
+    expect(screen.queryByText(/웹에서/)).toBeNull();
+    // 약 없음 카드에서 바로 등록 화면으로
+    await fireEvent.press(screen.getByRole('button', { name: '약 등록하기' }));
+    expect(mockPush).toHaveBeenCalledWith('/medications/new');
     expect(screen.getByRole('button', { name: '첫 기록 저장' })).toBeTruthy();
+  });
+});
+
+describe('오늘 화면 — 약 관리 진입', () => {
+  it('[약 관리 ›]·[약 관리 · 알림 설정]이 약 목록으로 가고, "웹에서 설정해요" 문구는 없다', async () => {
+    setup();
+    await renderToday();
+    await fireEvent.press(screen.getByRole('button', { name: '약 관리' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/medications');
+    await fireEvent.press(screen.getByRole('button', { name: '약 관리 · 알림 설정' }));
+    expect(mockPush).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText(/웹에서 (설정|등록)해요/)).toBeNull();
+  });
+
+  it('약 관리 화면에 다녀와 다시 보이면 투약 목록만 서버와 다시 맞춘다(첫 진입은 다시 읽지 않는다)', async () => {
+    setup();
+    await renderToday();
+    const todayCalls = () => calls.filter((c) => c.url.endsWith('/today')).length;
+    expect(todayCalls()).toBe(1);
+    // 약을 하나 더 등록하고 돌아온 상황
+    setup((r) =>
+      r.url.endsWith('/today')
+        ? json(200, todayExample({ doses: [...todayExample().doses, { medicationId: 'med-b', name: '레나메진', doseText: null, scheduledTime: '21:00', taken: false, medLogId: null, takenAt: null }] }))
+        : undefined,
+    );
+    await act(async () => {
+      mockFocusCb?.();
+    });
+    await screen.findByText('오늘 먹일 약 1 / 3');
+    expect(todayCalls()).toBe(2);
   });
 });
 
