@@ -521,5 +521,6 @@ describe('오늘 화면 — 지난 기록 진입', () => {
     await screen.findByText('새벽 4시 전 투약은 전날 기록으로 저장돼요');
     expect(screen.getByRole('link', { name: '지난 기록' }).getAttribute('href')).toBe('/history');
     expect(screen.getByRole('link', { name: '지난 기록 보기 ›' }).getAttribute('href')).toBe('/history');
+    expect(screen.getByRole('link', { name: '리포트 보기' }).getAttribute('href')).toBe('/report');
   });
 });

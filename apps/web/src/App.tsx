@@ -10,6 +10,7 @@ import MedicationsPage from './pages/MedicationsPage';
 import ReminderPage from './pages/ReminderPage';
 import HistoryPage from './pages/HistoryPage';
 import HistoryDayPage from './pages/HistoryDayPage';
+import ReportPage from './pages/ReportPage';
 import AccountPage from './pages/AccountPage';
 import PasswordChangePage from './pages/PasswordChangePage';
 import AccountDeletePage from './pages/AccountDeletePage';
@@ -24,6 +25,7 @@ import ServerDownPage from './pages/ServerDownPage';
 //   /medications/:id/reminder : 투약 알림 설정
 //   /history     : 지난 기록 보기(7일/30일, 체중 그래프)
 //   /history/:recordDate : 하루 상세(읽기 전용)
+//   /report      : 병원 방문 리포트(7/14/30일, 인쇄). ?range=7|14|30&from=history
 //   /pet         : 프로필 수정(사진 교체·삭제, 로그아웃)
 //   /account, /account/password, /account/delete : 계정 · 비밀번호 바꾸기 · 회원 탈퇴 (반려동물이 없어도 열린다)
 //   /today       : "오늘" 기록 화면 (알림을 눌러 열면 ?source=push)
@@ -102,6 +104,14 @@ export default function App() {
           element={
             <PetGate need="ready">
               <HistoryDayPage />
+            </PetGate>
+          }
+        />
+        <Route
+          path="/report"
+          element={
+            <PetGate need="ready">
+              <ReportPage />
             </PetGate>
           }
         />

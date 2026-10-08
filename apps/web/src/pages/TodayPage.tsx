@@ -5,6 +5,7 @@ import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
 import { HISTORY_TEXT } from '../lib/historyText';
+import { REPORT_TEXT } from '../lib/reportText';
 import { daysBetween, formatKg, formatRecordDate, LEVEL_LABELS, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
 import {
@@ -606,6 +607,14 @@ export default function TodayPage() {
               <Link to="/history" className="history-link-row">
                 <span>{HISTORY_TEXT.entryLink}</span>
               </Link>
+
+              <section className="card" aria-labelledby="report-entry-title">
+                <h2 id="report-entry-title">{REPORT_TEXT.entryCardTitle}</h2>
+                <p>{REPORT_TEXT.entryCardBody}</p>
+                <Link to="/report" className="btn-secondary link-button">
+                  {REPORT_TEXT.entryCardButton}
+                </Link>
+              </section>
 
               <Link to="/account" className="history-link-row">
                 <span>계정 · 로그아웃</span>

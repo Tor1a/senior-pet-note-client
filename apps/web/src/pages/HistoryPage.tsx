@@ -27,6 +27,7 @@ import {
   weightFactLines,
 } from '../lib/historyText';
 import type { HistoryResponse } from '../lib/petApi';
+import { REPORT_TEXT } from '../lib/reportText';
 import { usePet } from '../pet';
 
 // H1 지난 기록: 서버가 준 30일치를 한 번 받아 7일/30일은 화면에서 자른다(재요청 없음).
@@ -112,6 +113,10 @@ export default function HistoryPage() {
       <p className="visually-hidden" aria-live="polite">
         {rangeNotice}
       </p>
+
+      <Link to={`/report?range=${range}&from=history`} className="history-link-row">
+        <span>{REPORT_TEXT.historyLink}</span>
+      </Link>
 
       {loadError && (
         <div role="alert" className="error">

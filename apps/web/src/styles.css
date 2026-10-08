@@ -242,3 +242,84 @@ input[type='date'] { min-height: 3rem; font-size: 1.1rem; }
 .notice-box { border: 2px solid var(--sub); border-radius: 6px; padding: 0.5rem; background: #f4ece4; }
 .notice-box p { margin: 0; }
 .farewell { margin: 1rem 0; }
+
+/* ---------- 병원 방문 리포트 (.company/design/병원-방문-리포트.md 4·7장) ---------- */
+/* 화면은 한 열 문서 카드. 인쇄는 아래 @media print 가 흑백 A4 로 바꾼다(색에 기대지 않는다) */
+.report-page { max-width: 720px; }
+.report-page h1 { margin-bottom: 0.25rem; }
+.report-page .back-link { display: inline-flex; align-items: center; min-height: 3rem; color: var(--sub); }
+.range-toggle.report-range { grid-template-columns: repeat(3, 1fr); }
+.report-sheet { background: #fff; border: 1px solid #e8dfd4; border-radius: 12px; padding: 1rem; margin: 1rem 0; }
+.report-head p, .report-section p { margin: 0.2rem 0; }
+.report-doc-title, .report-pet { font-size: 1.2rem; font-weight: 700; }
+.report-section { padding: 0.75rem 0; border-top: 1px solid #e8dfd4; }
+.report-section h2 { font-weight: 700; margin-bottom: 0.25rem; }
+.report-sub { font-size: 1rem; font-weight: 700; margin: 0.75rem 0 0.25rem; }
+.report-count { font-size: 1.3rem; }
+.report-big { font-size: 1.4rem; font-weight: 700; }
+.report-weight-grid { display: flex; flex-direction: column; gap: 0.75rem; margin-top: 0.5rem; }
+.report-table { width: 100%; border-collapse: collapse; }
+.report-table th, .report-table td { text-align: left; padding: 0.4rem 0.25rem; border-bottom: 1px solid #e8dfd4; vertical-align: top; }
+.report-list { list-style: none; margin: 0.25rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.25rem; }
+.report-user-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.report-memos { margin: 0; }
+.report-memos dt { font-weight: 700; margin-top: 0.5rem; }
+.report-memos dd { margin: 0; }
+.chart-value { font-size: 14px; font-weight: 700; fill: var(--text); }
+.report-actions { display: flex; flex-direction: column; gap: 0.25rem; }
+.report-actions p { margin: 0; }
+.report-print-footer { display: none; }
+.print-only { display: none; }
+
+/* 면책 바닥글(fixed)이 본문과 겹치지 않게, 본문 아래에 쪽마다 반복되는 빈 자리(.report-frame-foot)를 둔다 */
+@page { size: A4 portrait; margin: 10mm 12mm 8mm; }
+@media print {
+  :root { font-size: 11pt; line-height: 1.3; color: #000; background: #fff; }
+  html, body { background: #fff !important; color: #000; min-height: 0; }
+  .no-print, .topbar, .push-banner, .save-bar { display: none !important; }
+  a { color: inherit; text-decoration: none; }
+  * { box-shadow: none !important; text-shadow: none !important; }
+  .page { max-width: none; margin: 0; padding: 0; }
+  .report-sheet { border: 0; border-radius: 0; padding: 0; margin: 0; }
+  .report-sheet *, .report-print-footer { color: #000 !important; background: transparent !important; }
+  .report-sheet .muted, .report-sheet .small { font-size: 9.5pt; }
+  .report-head { border-bottom: 2px solid #000; padding-bottom: 2mm; break-inside: avoid; }
+  .report-doc-title { font-size: 18pt; }
+  .report-pet { font-size: 16pt; }
+  .print-only { display: block; }
+  .report-frame { display: table; width: 100%; }
+  .report-frame-body { display: table-row-group; }
+  .report-frame-foot { display: table-footer-group; height: 8mm; }
+  .report-section { border-top: 1px solid #000; padding: 1.5mm 0; break-inside: avoid; }
+  .report-section p, .report-head p { margin: 0.5mm 0; }
+  /* 메모 구역·체중 구역은 통째로 밀지 않고 메모 한 건·표 한 행 단위로만 쪽을 나눈다 */
+  .report-section.report-memo-section, .report-section.report-weight-section { break-inside: auto; }
+  .report-memos .report-memo, .report-table tr { break-inside: avoid; }
+  .report-table thead { display: table-header-group; }
+  /* 한 장에 담으려고 짧은 줄은 한 줄로 잇는다(글자 크기는 그대로) */
+  .report-head p.strong, .report-head p.strong + p { display: inline; margin-right: 4mm; }
+  .report-glance p, .report-gaps p, .report-gaps h2 { display: inline; margin-right: 3mm; }
+  .report-gaps h2 { font-size: 11pt; }
+  .report-section .report-med-list { display: grid; grid-template-columns: 1fr 1fr; column-gap: 4mm; }
+  .report-memos .report-memo { display: grid; grid-template-columns: 34mm 1fr; column-gap: 3mm; }
+  .report-memos dt { margin-top: 1mm; }
+  .report-memos dd { margin-top: 1mm; }
+  .report-section .report-list { margin: 0.5mm 0; gap: 0.5mm; }
+  .report-section h2 { font-size: 13pt; break-after: avoid; }
+  .report-count { font-size: 16pt; }
+  .report-big { font-size: 16pt; }
+  .report-weight-grid { display: grid; grid-template-columns: 58% 1fr; gap: 4mm; align-items: start; }
+  .report-table { font-size: 9.5pt; line-height: 1.15; }
+  .report-table th, .report-table td { border: 1px solid #000; padding: 0 1mm; white-space: normal; overflow-wrap: anywhere; }
+  .report-table th[scope='row'] { white-space: nowrap; }
+  .report-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(80mm, 1fr)); column-gap: 4mm; }
+  .chart-box { border: 0; padding: 0; background: #fff; }
+  .chart-line { stroke: #000; stroke-width: 2.7px; }
+  .chart-line.dashed { stroke-dasharray: 4 3; }
+  .chart-dot { fill: #000; stroke: none; }
+  .chart-axis { fill: #000; font-size: 12px; }
+  .chart-grid { stroke: #999; stroke-width: 0.5px; }
+  .chart-value { fill: #000; font-size: 13px; }
+  .report-print-footer { display: block; position: fixed; left: 0; right: 0; bottom: 0; padding-top: 1mm; border-top: 1px solid #000; font-size: 9.5pt; text-align: center; }
+  :focus-visible { outline: none; }
+}
