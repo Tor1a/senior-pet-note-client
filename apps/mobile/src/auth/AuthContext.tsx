@@ -11,6 +11,7 @@ import type { AuthMode } from '../lib/loginForm';
 import type { User } from '../lib/api';
 import { ApiError } from '../lib/api';
 import { api, onUnauthorized } from '../services/client';
+import { clearPreferences } from '../services/preferences';
 import { releaseMobileDevice } from '../services/pushDevice';
 import { clearToken, loadToken, saveToken } from '../services/tokenStorage';
 
@@ -23,6 +24,13 @@ interface AuthContextValue {
   /** 로그인 또는 회원가입. 실패하면 ApiError 를 던진다(화면에서 toUserMessage 로 문구 변환). */
   authenticate: (mode: AuthMode, email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
+  /** 비밀번호 변경 성공: 응답의 새 토큰으로 즉시 교체한다(이전 토큰은 모두 401 이 된다). 로그인은 유지 */
+  replaceToken: (accessToken: string) => Promise<boolean>;
+  /** 탈퇴 204 후: 서버 기기 해제 없이 기기·토큰·로컬 정리 → 로그인 화면(탈퇴 안내 포함) */
+  finishWithdrawal: () => Promise<void>;
+  /** 로그인 화면에 탈퇴 완료 안내를 보일지 */
+  farewell: boolean;
+  clearFarewell: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -30,6 +38,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [user, setUser] = useState<User | null>(null);
+  const [farewell, setFarewell] = useState(false);
 
   // 앱 시작: 저장된 토큰 확인
   useEffect(() => {
@@ -77,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const trimmed = email.trim();
     const res = mode === 'signup' ? await api.signup(trimmed, password) : await api.login(trimmed, password);
     await saveToken(res.accessToken);
+    setFarewell(false);
     setUser(res.user);
     setStatus('signedIn');
   }, []);
@@ -90,9 +100,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setStatus('signedOut');
   }, []);
 
+  const replaceToken = useCallback(async (accessToken: string) => {
+    // 서버는 이미 새 비밀번호·새 토큰으로 바뀌었다. 메모리 토큰은 새 것으로 바뀌고(이번 실행은 계속 쓸 수 있다),
+    // 기기 저장만 실패하면 false 를 돌려 화면이 "다시 로그인" 안내를 덧붙이게 한다(던지지 않는다).
+    try {
+      await saveToken(accessToken);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const finishWithdrawal = useCallback(async () => {
+    // 계정이 이미 없어 서버 DELETE 는 못 한다 → Firebase 토큰과 로컬 기기 id 만 정리(최대 3초)
+    await releaseMobileDevice(false);
+    await clearToken();
+    await clearPreferences();
+    setUser(null);
+    setFarewell(true);
+    setStatus('signedOut'); // _layout 의 Stack.Protected 가 로그인 화면으로 보낸다(스택도 정리된다)
+  }, []);
+
+  const clearFarewell = useCallback(() => setFarewell(false), []);
+
   const value = useMemo(
-    () => ({ status, user, authenticate, signOut }),
-    [status, user, authenticate, signOut],
+    () => ({ status, user, authenticate, signOut, replaceToken, finishWithdrawal, farewell, clearFarewell }),
+    [status, user, authenticate, signOut, replaceToken, finishWithdrawal, farewell, clearFarewell],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

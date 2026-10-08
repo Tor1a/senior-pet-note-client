@@ -1,4 +1,4 @@
-// [공유 로직 테스트 사본] 원본: web/src/lib/api.test.ts (2026-10-07 복사)
+// [공유 로직 테스트 사본] 원본: web/src/lib/api.test.ts (2026-10-08 복사)
 // vitest import 한 줄 제거, vi.fn → jest.fn 만 바꿈(jest 전역 함수로 실행). 추후 packages/shared 로 통합 예정.
 import { ApiError, createApiClient, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from './api';
 
@@ -124,5 +124,86 @@ describe('toUserMessage — 한국어 안내 문구', () => {
     expect(toUserMessage(new ApiError('http', 400, 'VALIDATION_ERROR', 'x'), 'signup')).toContain('8자 이상');
     expect(toUserMessage(new ApiError('http', 401, 'UNAUTHORIZED', 'x'))).toBe('로그인이 만료됐어요. 다시 로그인해 주세요.');
     expect(toUserMessage(new Error('?'))).toBe('문제가 생겼어요. 잠시 후 다시 시도해 주세요.');
+  });
+});
+
+describe('Retry-After 헤더 (계정 API 429)', () => {
+  it('429 의 Retry-After 초를 ApiError 에 담는다', async () => {
+    const client = createApiClient({
+      baseUrl: 'http://x',
+      getToken: () => 't',
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ code: 'TOO_MANY_ATTEMPTS', message: 'm' }), {
+          status: 429,
+          headers: { 'Retry-After': '120' },
+        }),
+    });
+    await expect(client.request('/api/me/withdraw', { method: 'POST', body: {} })).rejects.toMatchObject({
+      status: 429,
+      code: 'TOO_MANY_ATTEMPTS',
+      retryAfterSec: 120,
+    });
+  });
+  it('400 CURRENT_PASSWORD_MISMATCH 는 onUnauthorized 를 부르지 않는다', async () => {
+    let called = 0;
+    const client = createApiClient({
+      baseUrl: 'http://x',
+      getToken: () => 't',
+      onUnauthorized: () => void called++,
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ code: 'CURRENT_PASSWORD_MISMATCH', message: 'm' }), { status: 400 }),
+    });
+    await expect(client.request('/api/me/password', { method: 'PUT', body: {} })).rejects.toBeInstanceOf(ApiError);
+    expect(called).toBe(0);
+  });
+});
+
+describe('API 클라이언트 — 토큰 교체 경합', () => {
+  it('요청을 보낸 뒤 토큰이 바뀌었다면 옛 토큰의 401 은 로그아웃하지 않는다', async () => {
+    let token = 'old';
+    const onUnauthorized = jest.fn();
+    const client = createApiClient({
+      baseUrl: 'http://x',
+      getToken: () => token,
+      onUnauthorized,
+      fetchImpl: async () => {
+        token = 'new'; // 응답이 오기 전에 비밀번호 변경으로 토큰이 교체됨
+        return new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: 'm' }), { status: 401 });
+      },
+    });
+    await expect(client.me()).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+  it('토큰이 그대로면 401 은 로그아웃한다', async () => {
+    const onUnauthorized = jest.fn();
+    const client = createApiClient({
+      baseUrl: 'http://x',
+      getToken: () => 'same',
+      onUnauthorized,
+      fetchImpl: async () => new Response(JSON.stringify({ code: 'UNAUTHORIZED', message: 'm' }), { status: 401 }),
+    });
+    await expect(client.me()).rejects.toMatchObject({ status: 401 });
+    expect(onUnauthorized).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('비밀번호 변경 동시 요청 충돌(409 PASSWORD_CHANGE_CONFLICT)', () => {
+  it('일반 409 문구가 아니라 다시 시도 안내를 보여 준다', () => {
+    const msg = toUserMessage(new ApiError('http', 409, 'PASSWORD_CHANGE_CONFLICT', 'x'), 'password');
+    expect(msg).toBe('다른 곳에서 비밀번호를 바꾸는 중이에요. 잠시 뒤에 다시 시도해 주세요.');
+    expect(msg).not.toContain('이미 처리된');
+  });
+
+  it('409 는 onUnauthorized 를 부르지 않는다', async () => {
+    const onUnauthorized = jest.fn();
+    const client = createApiClient({
+      baseUrl: 'http://x',
+      getToken: () => 'tok',
+      onUnauthorized,
+      fetchImpl: async () =>
+        new Response(JSON.stringify({ code: 'PASSWORD_CHANGE_CONFLICT', message: 'm' }), { status: 409 }),
+    });
+    await expect(client.me()).rejects.toMatchObject({ status: 409, code: 'PASSWORD_CHANGE_CONFLICT' });
+    expect(onUnauthorized).not.toHaveBeenCalled();
   });
 });

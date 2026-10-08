@@ -38,7 +38,7 @@ mobile/
 ## 준비
 - Node.js 20 이상 (확인한 버전: v24)
 - `npm install`
-- 환경변수: `.env.example` 을 `.env` 로 복사하고 `EXPO_PUBLIC_API_BASE_URL` 을 고친다.
+- 환경변수: `.env.example` 을 `.env` 로 복사하고 `EXPO_PUBLIC_API_BASE_URL` 을 고친다. 개인정보 처리방침 주소 `EXPO_PUBLIC_PRIVACY_POLICY_URL`(비우면 계정·탈퇴 화면의 링크 줄이 숨겨진다. 스토어 심사 전 설정 필요).
 
 | 실행 환경 | EXPO_PUBLIC_API_BASE_URL |
 |-----------|--------------------------|
@@ -101,6 +101,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
 - 401 을 받으면 토큰을 지우고 로그인 화면으로. 서버에 연결하지 못하면 토큰을 유지한다(오프라인 때마다 로그아웃되지 않게).
 - 로그아웃 API 는 없다(refresh 토큰 없음). 기기에서 토큰만 지운다.
+- 계정 관리(`src/account/`, 라우트 `/account`·`/account/password`·`/account/delete`): 오늘 맨 아래·반려동물 없음 안내 화면의 [계정] 버튼으로 진입. 비밀번호 변경 성공 시 `AuthContext.replaceToken` 으로 새 토큰 즉시 교체, 탈퇴 204 후 `finishWithdrawal`(서버 기기 해제 없이 FCM·토큰·설정 정리 → 로그인 화면에 탈퇴 안내). 400 `CURRENT_PASSWORD_MISMATCH` 는 강제 로그아웃하지 않는다. 공유 사본: `accountApi/accountForm/privacyConfig`.
 
 ## 공유 패키지 통합 계획
 현재 `src/lib/` 의 아래 파일은 `web/src/lib/` 의 **사본**이다. 파일 상단에 동기화 필요 주석이 있다.

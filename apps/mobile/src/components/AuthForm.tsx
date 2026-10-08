@@ -1,19 +1,21 @@
 // 로그인·회원가입 공통 폼
 // 입력 검증 규칙(validateLoginForm)과 오류 문구(toUserMessage)는 웹과 같은 src/lib 을 쓴다.
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Pressable, StyleSheet, View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { toUserMessage } from '../lib/api';
 import { DISCLAIMER } from '../lib/constants';
 import { hasErrors, PASSWORD_MIN_LENGTH, validateLoginForm, type AuthMode, type LoginFormErrors } from '../lib/loginForm';
 import { apiConfig } from '../services/client';
+import { NoticeCard, NoticeTitle } from './NoticeCard';
 import { colors, spacing, touch } from '../theme';
 import { AppButton, AppText, Screen, TextField } from './ui';
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
-  const { authenticate } = useAuth();
+  const { authenticate, farewell, clearFarewell } = useAuth();
+  const farewellRef = useRef<View>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
@@ -22,6 +24,19 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [submitting, setSubmitting] = useState(false);
 
   const isSignup = mode === 'signup';
+
+  // 로그인·가입 화면을 떠나면(모드 전환 포함) 탈퇴 안내는 사라진다
+  useEffect(() => clearFarewell, [clearFarewell]);
+
+  // 탈퇴 직후에는 완료 안내로 스크린리더 초점을 옮긴다(이메일 칸보다 먼저 읽힌다)
+  useEffect(() => {
+    if (!farewell) return;
+    const t = setTimeout(() => {
+      const node = farewellRef.current ? findNodeHandle(farewellRef.current) : null;
+      if (node) AccessibilityInfo.setAccessibilityFocus(node);
+    }, 100);
+    return () => clearTimeout(t);
+  }, [farewell]);
 
   async function submit() {
     const nextErrors = validateLoginForm({ email, password, passwordConfirm }, mode);
@@ -43,6 +58,16 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
       <AppText variant="title" accessibilityRole="header">
         {isSignup ? '회원가입' : '시니어펫 노트 로그인'}
       </AppText>
+
+      {farewell ? (
+        <View ref={farewellRef} accessible accessibilityLabel="탈퇴가 끝났어요. 계정과 기록을 모두 지웠어요. 이용해 주셔서 감사합니다.">
+          <NoticeCard kind="ok">
+            <NoticeTitle ok>탈퇴가 끝났어요.</NoticeTitle>
+            <AppText>계정과 기록을 모두 지웠어요.</AppText>
+            <AppText>이용해 주셔서 감사합니다.</AppText>
+          </NoticeCard>
+        </View>
+      ) : null}
 
       {!apiConfig.ok ? (
         <AppText style={styles.notice} accessibilityRole="alert">

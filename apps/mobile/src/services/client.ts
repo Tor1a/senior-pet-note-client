@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 import { createApiClient } from '../lib/api';
 import { createPetApi } from '../lib/petApi';
 import { createReminderApi } from '../lib/reminderApi';
+import { createAccountApi } from '../lib/accountApi';
 import { resolveApiConfig } from './config';
 import { clearToken, getToken } from './tokenStorage';
 
@@ -37,3 +38,6 @@ export const api = createApiClient({
 export const reminderApi = createReminderApi(api);
 
 export const petApi = createPetApi(api);
+
+/** 비밀번호 변경·회원 탈퇴 API (계약: docs/api-account.md) */
+export const accountApi = createAccountApi(api);

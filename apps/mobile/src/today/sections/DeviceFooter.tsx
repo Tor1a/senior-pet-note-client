@@ -1,13 +1,17 @@
-// 화면 맨 아래: 투약 알림 받기 카드 + [약 관리 · 알림 설정] + 로그아웃 (자리표시 화면에서 옮겨 옴. 기능 삭제 금지)
+// 화면 맨 아래: 투약 알림 받기 카드 + [약 관리 · 알림 설정] + [계정] + 로그아웃 (자리표시 화면에서 옮겨 옴. 기능 삭제 금지)
 // - [알림 받기](권한 요청)는 그대로 둔다. 알림 규칙은 약 관리 화면(/medications)에서 정한다.
 // - onManage 가 있을 때만 약 관리 진입 버튼을 보인다(반려동물이 없는 안내 화면에서는 약을 등록할 수 없어 숨김).
 //   카드가 숨는 상태(unavailable·checking)에서도 약 관리에는 갈 수 있어야 하므로 버튼은 카드 밖에 둔다.
+// - [계정](비밀번호 바꾸기·회원 탈퇴)은 반려동물이 없는 안내 화면에서도 보인다(탈퇴 경로가 막히면 안 된다).
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useAuth } from '../../auth/AuthContext';
 import { AppButton, AppText, Card } from '../../components/ui';
+import { ACCOUNT_HREF } from '../../account/routes';
 import { usePush } from '../../push/pushContext';
 
 export function DeviceFooter({ onManage }: { onManage?: () => void }) {
+  const router = useRouter();
   const { signOut } = useAuth();
   const { state, requestPermission, recheck } = usePush();
   const [signingOut, setSigningOut] = useState(false);
@@ -41,6 +45,8 @@ export function DeviceFooter({ onManage }: { onManage?: () => void }) {
       )}
 
       {onManage ? <AppButton label="약 관리 · 알림 설정" variant="secondary" onPress={onManage} /> : null}
+
+      <AppButton label="계정" variant="secondary" onPress={() => router.push(ACCOUNT_HREF as never)} />
 
       <AppButton
         label="로그아웃"
