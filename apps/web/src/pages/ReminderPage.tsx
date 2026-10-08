@@ -2,19 +2,23 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent, type Reac
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError, toUserMessage } from '../lib/api';
 import { petApi, reminderApi } from '../lib/client';
-import { addDays, formatSeoulDateTime, formatTime, seoulDateString } from '../lib/format';
+import { addDays, formatTime, seoulDateString } from '../lib/format';
 import type { Medication } from '../lib/petApi';
 import { DAYS_OF_WEEK, INTERVAL_DAYS_MAX, INTERVAL_DAYS_MIN, type Reminder, type RepeatType } from '../lib/reminderApi';
 import {
-  buildReminderBody,
+  buildSaveBody,
   DAY_LABELS,
   DAY_NAMES,
   dawnNotice,
   formFromReminder,
+  GONE_NOTICE,
   intervalHint,
   nextFireText,
   REPEAT_LABELS,
+  SAVE_FAILED_400,
+  saveMessage,
   sameReminderBody,
+  START_DATE_MAX_DAYS,
   stepInterval,
   summaryText,
   toggleDay,
@@ -33,19 +37,7 @@ import { cannotReceive, usePush, type PushDeviceState } from '../push/PushProvid
 // - 권한 창은 사전 안내 대화상자의 [알림 허용하기]를 누른 뒤에만 띄운다.
 
 const REPEATS: RepeatType[] = ['daily', 'weekly', 'interval'];
-/** 시작일 상한: 서버는 400일 안에 회차가 없으면 nextFireAt 을 null 로 준다(설계 G2 의견 2) */
-const START_DATE_MAX_DAYS = 365;
-
-const SAVE_FAILED_400 = '알림 설정을 저장하지 못했어요. 고른 내용을 다시 확인해 주세요.';
-const GONE_NOTICE = '목록에서 뺀 약이에요. 약 목록으로 돌아왔어요.';
-
 type DialogPurpose = 'save' | 'device';
-
-function saveMessage(r: Reminder, device: PushDeviceState): string {
-  if (!r.enabled) return '알림을 껐어요. 고른 설정은 그대로 남아 있어요.';
-  if (cannotReceive(device)) return '알림을 저장했어요. 다만 이 기기에서는 알림을 받을 수 없어요.';
-  return r.nextFireAt ? `알림을 저장했어요. 다음 알림: ${formatSeoulDateTime(r.nextFireAt)}` : '알림을 저장했어요.';
-}
 
 export default function ReminderPage() {
   const { id = '' } = useParams();
@@ -129,17 +121,14 @@ export default function ReminderPage() {
   async function doSave(device: PushDeviceState) {
     if (!form || !saved) return;
     // 끈 상태로 저장할 때 숨겨 둔 값이 잘못돼 있으면(예: 요일 0개) 마지막으로 저장된 규칙을 유지한다
-    const body =
-      !form.enabled && validateReminderForm(form)
-        ? { ...buildReminderBody(formFromReminder(saved)), enabled: false }
-        : buildReminderBody(form);
+    const body = buildSaveBody(form, saved);
     setSaving(true);
     setSaveError(null);
     try {
       const r = await reminderApi.putReminder(id, body);
       setSaved(r);
       setForm(formFromReminder(r));
-      setNotice(saveMessage(r, device));
+      setNotice(saveMessage(r, cannotReceive(device)));
       if (r.enabled && device === 'ios-browser') setIosOpen(true);
     } catch (err) {
       if (err instanceof ApiError && err.status === 404) {

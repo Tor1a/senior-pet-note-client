@@ -81,6 +81,12 @@ export function stepInterval(current: number, delta: number): number {
   return Math.min(INTERVAL_DAYS_MAX, Math.max(INTERVAL_DAYS_MIN, current + delta));
 }
 
+/** 시작일 상한: 서버는 400일 안에 회차가 없으면 nextFireAt 을 null 로 준다(설계 G2 의견 2) */
+export const START_DATE_MAX_DAYS = 365;
+
+export const SAVE_FAILED_400 = '알림 설정을 저장하지 못했어요. 고른 내용을 다시 확인해 주세요.';
+export const GONE_NOTICE = '목록에서 뺀 약이에요. 약 목록으로 돌아왔어요.';
+
 /** 화면 상태 → PUT 본문 (전체 교체) */
 export function buildReminderBody(f: ReminderForm): ReminderInput {
   const body: ReminderInput = { enabled: f.enabled, repeat: f.repeat };
@@ -190,6 +196,24 @@ export function nextFireText(r: Reminder): string {
 
 export type ReminderStatusKind = 'off' | 'on' | 'ended';
 
+/** 약 목록 카드의 알림 상태 줄 스크린리더 라벨 (설계 3-2, 모바일 설계 10-4). 웹 aria-label 과 같은 문장 */
+export function reminderStatusLabel(
+  medName: string,
+  medTimes: string[],
+  status: { kind: ReminderStatusKind; text: string },
+  deviceCannotReceive: boolean,
+): string {
+  const showDeviceLine = status.kind === 'on' && deviceCannotReceive;
+  return [
+    `${medName} ${status.text.replace(/ · /g, ', ')}`,
+    status.kind === 'on' ? medTimes.map(formatTime).join('와 ') : '',
+    showDeviceLine ? '이 기기에서는 받을 수 없어요' : '',
+    '누르면 알림 설정으로 가요',
+  ]
+    .filter(Boolean)
+    .join('. ');
+}
+
 /** 약 목록 카드의 알림 상태 줄 (설계 3-2) */
 export function reminderStatus(r: Reminder): { kind: ReminderStatusKind; text: string } {
   if (!r.enabled) return { kind: 'off', text: '알림 꺼짐' };
@@ -204,4 +228,21 @@ export function reminderStatus(r: Reminder): { kind: ReminderStatusKind; text: s
         : '매일';
   const until = r.endDate ? ` · ${formatMonthDay(r.endDate)}까지` : '';
   return { kind: 'on', text: `알림 켜짐 · ${repeat}${until}` };
+}
+
+/**
+ * 저장 본문 결정. 끈 상태로 저장할 때 숨겨 둔 값이 잘못돼 있으면(예: 요일 0개)
+ * 마지막으로 저장된 규칙을 유지하고 enabled:false 만 보낸다.
+ */
+export function buildSaveBody(form: ReminderForm, saved: Reminder): ReminderInput {
+  return !form.enabled && validateReminderForm(form)
+    ? { ...buildReminderBody(formFromReminder(saved)), enabled: false }
+    : buildReminderBody(form);
+}
+
+/** 저장 후 안내 문구 (설계 4-10). cannotReceive: 이 기기에서 알림을 받을 수 없는 상태인지(플랫폼이 판단해서 넘긴다) */
+export function saveMessage(r: Reminder, cannotReceive: boolean): string {
+  if (!r.enabled) return '알림을 껐어요. 고른 설정은 그대로 남아 있어요.';
+  if (cannotReceive) return '알림을 저장했어요. 다만 이 기기에서는 알림을 받을 수 없어요.';
+  return r.nextFireAt ? `알림을 저장했어요. 다음 알림: ${formatSeoulDateTime(r.nextFireAt)}` : '알림을 저장했어요.';
 }

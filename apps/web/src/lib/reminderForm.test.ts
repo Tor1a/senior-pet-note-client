@@ -4,10 +4,13 @@ import type { Reminder } from './reminderApi';
 import { parseMedReminderData } from './reminderApi';
 import {
   buildReminderBody,
+  buildSaveBody,
   dawnNotice,
   formFromReminder,
   nextFireText,
   reminderStatus,
+  reminderStatusLabel,
+  saveMessage,
   stepInterval,
   summaryText,
   toggleDay,
@@ -187,5 +190,74 @@ describe('푸시 data 해석 (계약 4장)', () => {
     expect(parseMedReminderData(data)).toEqual(data);
     expect(parseMedReminderData({ type: 'other' })).toBeNull();
     expect(parseMedReminderData(undefined)).toBeNull();
+  });
+});
+
+describe('buildSaveBody', () => {
+  it('켠 상태는 buildReminderBody 와 같다', () => {
+    const f = formFromReminder(reminderExample({ daysOfWeek: ['mon', 'fri'] }));
+    expect(buildSaveBody(f, reminderExample())).toEqual(buildReminderBody(f));
+  });
+
+  it('끈 상태에서 숨은 값이 잘못이면(요일 0개) 마지막 저장값을 유지하고 enabled:false', () => {
+    const saved = reminderExample({ daysOfWeek: ['mon', 'wed'] });
+    const f = { ...formFromReminder(saved), enabled: false, daysOfWeek: [] };
+    expect(buildSaveBody(f, saved)).toEqual({
+      enabled: false,
+      repeat: 'weekly',
+      daysOfWeek: ['mon', 'wed'],
+      startDate: '2026-10-06',
+      endDate: null,
+    });
+  });
+
+  it('끈 상태라도 값이 올바르면 고른 값을 그대로 보낸다', () => {
+    const saved = reminderExample();
+    const f = { ...formFromReminder(saved), enabled: false, daysOfWeek: ['sat' as const] };
+    expect(buildSaveBody(f, saved)).toEqual({
+      enabled: false,
+      repeat: 'weekly',
+      daysOfWeek: ['sat'],
+      startDate: '2026-10-06',
+      endDate: null,
+    });
+  });
+});
+
+describe('saveMessage', () => {
+  it('끔', () => {
+    expect(saveMessage(reminderExample({ enabled: false }), false)).toBe('알림을 껐어요. 고른 설정은 그대로 남아 있어요.');
+    expect(saveMessage(reminderExample({ enabled: false }), true)).toBe('알림을 껐어요. 고른 설정은 그대로 남아 있어요.');
+  });
+  it('이 기기에서 못 받음', () => {
+    expect(saveMessage(reminderExample(), true)).toBe('알림을 저장했어요. 다만 이 기기에서는 알림을 받을 수 없어요.');
+  });
+  it('다음 알림 있음·없음', () => {
+    expect(saveMessage(reminderExample(), false)).toBe(
+      `알림을 저장했어요. 다음 알림: ${formatSeoulDateTime('2026-10-06T23:00:00Z')}`,
+    );
+    expect(saveMessage(reminderExample({ nextFireAt: null }), false)).toBe('알림을 저장했어요.');
+  });
+});
+
+describe('reminderStatusLabel', () => {
+  const times = ['08:00', '20:00'];
+  it('켜짐: 약 이름·반복·시각·눌러서 이동', () => {
+    expect(reminderStatusLabel('아조딜', times, reminderStatus(reminderExample()), false)).toBe(
+      '아조딜 알림 켜짐, 월·수. 오전 8:00와 오후 8:00. 누르면 알림 설정으로 가요',
+    );
+  });
+  it('켜짐 + 이 기기에서 못 받음', () => {
+    expect(reminderStatusLabel('아조딜', times, reminderStatus(reminderExample()), true)).toBe(
+      '아조딜 알림 켜짐, 월·수. 오전 8:00와 오후 8:00. 이 기기에서는 받을 수 없어요. 누르면 알림 설정으로 가요',
+    );
+  });
+  it('꺼짐·기간 끝남은 시각과 기기 문구가 없다', () => {
+    expect(reminderStatusLabel('아조딜', times, reminderStatus(reminderExample({ enabled: false })), true)).toBe(
+      '아조딜 알림 꺼짐. 누르면 알림 설정으로 가요',
+    );
+    expect(reminderStatusLabel('아조딜', times, reminderStatus(reminderExample({ nextFireAt: null })), true)).toBe(
+      '아조딜 알림 기간이 끝났어요. 누르면 알림 설정으로 가요',
+    );
   });
 });

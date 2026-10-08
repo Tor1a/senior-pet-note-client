@@ -4,37 +4,28 @@ import { ApiError, toUserMessage } from '../lib/api';
 import { petApi, reminderApi } from '../lib/client';
 import { DISCLAIMER } from '../lib/constants';
 import { formatTime } from '../lib/format';
-import type { Medication, MedicationInput } from '../lib/petApi';
+import {
+  addTime,
+  DOSE_MAX,
+  draftFromMedication,
+  EMPTY_MEDICATION_DRAFT,
+  MAX_TIMES,
+  NAME_MAX,
+  removeTime,
+  setTimeAt,
+  toMedicationInput,
+  validateMedicationDraft,
+  type MedicationDraft,
+} from '../lib/medicationForm';
+import type { Medication } from '../lib/petApi';
 import type { Reminder } from '../lib/reminderApi';
-import { reminderStatus } from '../lib/reminderForm';
+import { reminderStatus, reminderStatusLabel } from '../lib/reminderForm';
 import { cannotReceive, usePush } from '../push/PushProvider';
 import { usePet } from '../pet';
 
 // 약 관리 (/medications, 온보딩 2/2 이면 ?onboarding=1, ?edit=<약 id> 면 그 약 고치기 폼을 연 상태)
 // 이름(필수), 용량(선택), 하루 시각 1~3개(서로 달라야 함)
 // 약 카드마다 알림 상태 줄 + [알림 설정] (화면 설계 3장). 목록 API 에 알림 정보가 없어 약마다 GET reminder 를 병렬로 부른다.
-const NAME_MAX = 50;
-const DOSE_MAX = 50;
-const MAX_TIMES = 3;
-
-interface Draft {
-  id: string | null; // null 이면 새 약
-  name: string;
-  doseText: string;
-  times: string[];
-}
-
-const EMPTY_DRAFT: Draft = { id: null, name: '', doseText: '', times: ['08:00'] };
-
-/** 입력 확인. 문제가 있으면 안내 문구 */
-export function validateMedicationDraft(d: Draft): string | null {
-  if (!d.name.trim()) return '약 이름을 적어 주세요.';
-  if (d.name.trim().length > NAME_MAX) return `약 이름은 ${NAME_MAX}자까지 적을 수 있어요.`;
-  if (d.times.length < 1 || d.times.length > MAX_TIMES) return '먹이는 시각을 1~3개 정해 주세요.';
-  if (d.times.some((t) => !/^\d{2}:\d{2}$/.test(t))) return '먹이는 시각을 모두 골라 주세요.';
-  if (new Set(d.times).size !== d.times.length) return '같은 시각이 두 번 들어갔어요. 서로 다른 시각으로 골라 주세요.';
-  return null;
-}
 
 export default function MedicationsPage() {
   const { pet, reload } = usePet();
@@ -46,7 +37,7 @@ export default function MedicationsPage() {
 
   const [meds, setMeds] = useState<Medication[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [draft, setDraft] = useState<Draft | null>(null);
+  const [draft, setDraft] = useState<MedicationDraft | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -99,7 +90,7 @@ export default function MedicationsPage() {
   useEffect(() => {
     if (!meds || !editId) return;
     const m = meds.find((x) => x.id === editId);
-    if (m) setDraft({ id: m.id, name: m.name, doseText: m.doseText ?? '', times: [...m.times] });
+    if (m) setDraft(draftFromMedication(m));
     const next = new URLSearchParams(params);
     next.delete('edit');
     setParams(next, { replace: true });
@@ -107,7 +98,7 @@ export default function MedicationsPage() {
 
   // 약이 하나도 없으면 바로 입력 폼을 연다
   useEffect(() => {
-    if (meds && meds.length === 0 && draft === null) setDraft({ ...EMPTY_DRAFT });
+    if (meds && meds.length === 0 && draft === null) setDraft({ ...EMPTY_MEDICATION_DRAFT });
   }, [meds]);
 
   async function onSubmit(e: FormEvent) {
@@ -116,11 +107,7 @@ export default function MedicationsPage() {
     const problem = validateMedicationDraft(draft);
     setFormError(problem);
     if (problem) return;
-    const input: MedicationInput = {
-      name: draft.name.trim(),
-      doseText: draft.doseText.trim() ? draft.doseText.trim() : null,
-      times: [...draft.times].sort(),
-    };
+    const input = toMedicationInput(draft);
     setBusy(true);
     try {
       if (draft.id) {
@@ -158,7 +145,7 @@ export default function MedicationsPage() {
 
   function setTime(i: number, value: string) {
     if (!draft) return;
-    setDraft({ ...draft, times: draft.times.map((t, idx) => (idx === i ? value : t)) });
+    setDraft({ ...draft, times: setTimeAt(draft.times, i, value) });
   }
 
   return (
@@ -224,7 +211,7 @@ export default function MedicationsPage() {
                         className="btn-secondary"
                         onClick={() => {
                           setFormError(null);
-                          setDraft({ id: m.id, name: m.name, doseText: m.doseText ?? '', times: [...m.times] });
+                          setDraft(draftFromMedication(m));
                         }}
                       >
                         고치기
@@ -281,7 +268,7 @@ export default function MedicationsPage() {
                     <button
                       type="button"
                       className="btn-link"
-                      onClick={() => setDraft({ ...draft, times: draft.times.filter((_, idx) => idx !== i) })}
+                      onClick={() => setDraft({ ...draft, times: removeTime(draft.times, i) })}
                     >
                       이 시각 빼기
                     </button>
@@ -292,7 +279,7 @@ export default function MedicationsPage() {
                 <button
                   type="button"
                   className="btn-secondary"
-                  onClick={() => setDraft({ ...draft, times: [...draft.times, '20:00'].slice(0, MAX_TIMES) })}
+                  onClick={() => setDraft({ ...draft, times: addTime(draft.times) })}
                 >
                   + 시각 추가
                 </button>
@@ -319,7 +306,7 @@ export default function MedicationsPage() {
             onClick={() => {
               setFormError(null);
               setNotice(null);
-              setDraft({ ...EMPTY_DRAFT });
+              setDraft({ ...EMPTY_MEDICATION_DRAFT });
             }}
           >
             + 약 추가
@@ -355,15 +342,7 @@ function ReminderStatusLine({
   }
   const status = reminderStatus(reminder);
   const showDeviceLine = status.kind === 'on' && deviceCannotReceive;
-  const times = med.times.map(formatTime).join('와 ');
-  const label = [
-    `${med.name} ${status.text.replace(/ · /g, ', ')}`,
-    status.kind === 'on' ? times : '',
-    showDeviceLine ? '이 기기에서는 받을 수 없어요' : '',
-    '누르면 알림 설정으로 가요',
-  ]
-    .filter(Boolean)
-    .join('. ');
+  const label = reminderStatusLabel(med.name, med.times, status, showDeviceLine);
   return (
     <Link
       to={`/medications/${encodeURIComponent(med.id)}/reminder`}
