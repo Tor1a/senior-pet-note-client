@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { AppInput, AppText } from '../../components/ui';
 import { MEMO_MAX_LENGTH } from '../../lib/constants';
+import { PRIVACY_TEXT } from '../../lib/privacyText';
 import { spacing } from '../../theme';
 
 export function MemoSection({ value, onChange }: { value: string; onChange: (text: string) => void }) {
@@ -22,6 +23,8 @@ export function MemoSection({ value, onChange }: { value: string; onChange: (tex
         onChangeText={onChange}
         style={[styles.memo, (open || value) && styles.memoOpen]}
       />
+      {/* 힌트로 또 읽히면 같은 문장이 두 번 낭독되므로 보이는 글자만 두고 입력칸 바로 아래에 붙인다(README 참고) */}
+      <AppText variant="secondary">{PRIVACY_TEXT.memoHelp}</AppText>
       <AppText variant="secondary" style={styles.count}>{`${value.length} / ${MEMO_MAX_LENGTH}`}</AppText>
     </View>
   );

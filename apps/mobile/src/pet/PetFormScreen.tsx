@@ -29,6 +29,7 @@ import {
   type PetFieldErrors,
 } from '../lib/petForm';
 import type { Species } from '../lib/petApi';
+import { PRIVACY_TEXT } from '../lib/privacyText';
 import { isHugeFont, isLargeFont } from '../medications/layout';
 import { PetLoading } from './PetGate';
 import { goBackOr } from '../medications/routes';
@@ -335,6 +336,7 @@ export default function PetFormScreen({ mode, from: fromParam }: { mode: 'new' |
           editable={!busy}
           onChangeText={(text) => change({ conditions: toSingleLine(text) })}
         />
+        <AppText variant="secondary">{PRIVACY_TEXT.memoHelp}</AppText>
         {remaining !== null ? (
           <AppText variant="secondary" accessibilityLiveRegion="polite">
             {remaining <= 0 ? PET_TEXT.conditionsFull : remainingText(remaining)}

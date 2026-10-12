@@ -135,6 +135,11 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 문구는 공유 사본 `lib/pushActionText.ts`(+ 금지어 검사 테스트). 웹 원본을 먼저 고치고 복사한다(헤더 3줄 외 diff 없음, 테스트는 `vi` → `jest` 규칙).
 - 확인하지 못한 것: 에뮬레이터·실기기에서의 실제 화면, TalkBack/VoiceOver 읽기 순서(Jest 컴포넌트 테스트와 `expo export --platform web` 번들만 확인). 수동 확인: 개발 빌드에서 같은 약 2회차(08:00·20:00)를 만들고 20:00 알림을 탭해 20:00 카드에만 큰 버튼이 붙는지, 체크 후 08:00 에 붙지 않는지(실제 푸시 발송은 대표님 승인 필요).
 
+## 개인정보 후속 조치 (2026-10-12)
+- **만 14세 확인(가입 화면만):** `components/AuthForm.tsx` 가입 모드에 "만 14세 이상입니다." 체크가 필요하다(체크 없이 [가입하기]를 누르면 칸 오류, 요청 안 나감). **클라이언트 전용이라 서버에 기록하지 않는다.** 가입 요청 본문은 그대로. 로그인 화면에는 없다. `EXPO_PUBLIC_PRIVACY_POLICY_URL` 이 있으면 체크 아래에 처리방침 링크를 둔다.
+- **메모 안내:** 오늘 메모(`MemoSection`)와 반려동물 폼의 질환 입력칸 아래에 "반려동물의 기록만 적어 주세요. 보호자 본인의 건강 정보는 적지 마세요." 가 입력칸 바로 아래에 항상 보인다. `accessibilityHint` 는 쓰지 않는다: 보이는 글자가 이미 스크린리더에 읽혀 같은 문장이 두 번 낭독되기 때문이다(`accessibilityLabelledBy` 는 안드로이드 전용이라 쓰지 않았다). 문구는 `lib/privacyText.ts`(웹 원본의 사본).
+- 로그인 없이 보는 계정 삭제 안내 페이지(`/delete-account`)는 **웹에만** 있다.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.

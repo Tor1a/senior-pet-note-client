@@ -4,14 +4,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'expo-router';
 import { AccessibilityInfo, findNodeHandle, Pressable, StyleSheet, View } from 'react-native';
+import { PrivacyLink } from '../account/AccountParts';
 import { useAuth } from '../auth/AuthContext';
 import { toUserMessage } from '../lib/api';
 import { DISCLAIMER } from '../lib/constants';
 import { hasErrors, PASSWORD_MIN_LENGTH, validateLoginForm, type AuthMode, type LoginFormErrors } from '../lib/loginForm';
+import { PRIVACY_TEXT, validateAgeConfirm } from '../lib/privacyText';
 import { apiConfig } from '../services/client';
 import { NoticeCard, NoticeTitle } from './NoticeCard';
 import { colors, spacing, touch } from '../theme';
-import { AppButton, AppText, Screen, TextField } from './ui';
+import { AppButton, AppText, ChoiceButton, Screen, TextField } from './ui';
 
 export function AuthForm({ mode }: { mode: AuthMode }) {
   const { authenticate, farewell, clearFarewell } = useAuth();
@@ -21,6 +23,9 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [errors, setErrors] = useState<LoginFormErrors>({});
   const [serverError, setServerError] = useState<string | null>(null);
+  // 만 14세 확인: 화면에서만 확인하고 가입 요청에 싣지 않는다(저장 안 함)
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [ageError, setAgeError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
 
   const isSignup = mode === 'signup';
@@ -40,9 +45,11 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
 
   async function submit() {
     const nextErrors = validateLoginForm({ email, password, passwordConfirm }, mode);
+    const ageProblem = isSignup ? validateAgeConfirm(ageConfirmed) : undefined;
     setErrors(nextErrors);
+    setAgeError(ageProblem);
     setServerError(null);
-    if (hasErrors(nextErrors)) return;
+    if (hasErrors(nextErrors) || ageProblem) return;
     setSubmitting(true);
     try {
       await authenticate(mode, email, password);
@@ -108,6 +115,24 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
           autoComplete="new-password"
           textContentType="newPassword"
         />
+      ) : null}
+      {isSignup ? (
+        <>
+          <ChoiceButton
+            role="checkbox"
+            tall
+            label={PRIVACY_TEXT.ageCheck}
+            selected={ageConfirmed}
+            onPress={() => {
+              setAgeConfirmed(!ageConfirmed);
+              setAgeError(undefined);
+            }}
+          />
+          {ageError ? (
+            <AppText variant="secondary" accessibilityLiveRegion="polite">{`! ${ageError}`}</AppText>
+          ) : null}
+          <PrivacyLink />
+        </>
       ) : null}
 
       {serverError ? (
