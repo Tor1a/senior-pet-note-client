@@ -6,6 +6,7 @@ import UndoNotice from '../components/UndoNotice';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
+import { PRIVACY_TEXT } from '../lib/privacyText';
 import { HISTORY_TEXT } from '../lib/historyText';
 import { bigDoseButtonLabel, PUSH_ACTION_TEXT } from '../lib/pushActionText';
 import { REPORT_TEXT } from '../lib/reportText';
@@ -931,10 +932,14 @@ export default function TodayPage() {
                   rows={memoOpen || form.memo ? 3 : 1}
                   maxLength={MEMO_MAX_LENGTH}
                   placeholder="오늘 있었던 일을 짧게 남겨 두세요"
+                  aria-describedby="memo-help"
                   value={form.memo}
                   onFocus={() => setMemoOpen(true)}
                   onChange={(e) => changeForm({ ...form, memo: e.target.value })}
                 />
+                <p id="memo-help" className="muted">
+                  {PRIVACY_TEXT.memoHelp}
+                </p>
                 <p className="muted small align-end">
                   {form.memo.length} / {MEMO_MAX_LENGTH}
                 </p>

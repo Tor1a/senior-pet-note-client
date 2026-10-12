@@ -1,12 +1,31 @@
 /// <reference types="vitest/config" />
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+
+// 이메일 형식은 src/lib/deleteGuide.ts 의 EMAIL_PATTERN 과 같게 유지한다(설정 파일이 src 를 불러오면 Vite 경고가 나서 복사해 둠)
+const EMAIL_PATTERN = /^[^\s@<>"?&,%;#]+@[^\s@<>"?&,%;#]+\.[^\s@<>"?&,%;#]+$/;
+
+// 빌드(vite build)할 때만: /delete-account 의 문의 이메일이 비었거나 형식이 틀리면 경고한다(빌드는 실패시키지 않음, 개발 모드는 조용히)
+function supportEmailWarning(): Plugin {
+  return {
+    name: 'spn-support-email-warning',
+    configResolved(config) {
+      if (config.command !== 'build') return;
+      if (!EMAIL_PATTERN.test((config.env.VITE_SUPPORT_EMAIL ?? '').trim())) {
+        console.warn(
+          '\n[경고] VITE_SUPPORT_EMAIL 이 비었거나 이메일 형식이 아니에요. /delete-account 의 이메일 요청 안내 줄이 숨겨져요. 스토어 제출 전에 채워 주세요.\n',
+        );
+      }
+    },
+  };
+}
 
 // Vite 설정: React + PWA(manifest, 서비스워커) + Vitest
 export default defineConfig({
   plugins: [
     react(),
+    supportEmailWarning(),
     VitePWA({
       // 새 버전이 배포되면 서비스워커를 자동으로 갱신한다(sw.ts 에서 skipWaiting + clientsClaim)
       registerType: 'autoUpdate',

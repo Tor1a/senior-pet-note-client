@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useAuth } from '../auth';
 import { toUserMessage } from '../lib/api';
+import { PrivacyLink } from '../components/accountParts';
 import { DISCLAIMER } from '../lib/constants';
 import {
   hasErrors,
@@ -9,6 +10,7 @@ import {
   type AuthMode,
   type LoginFormErrors,
 } from '../lib/loginForm';
+import { PRIVACY_TEXT, validateAgeConfirm } from '../lib/privacyText';
 
 // 이메일 + 비밀번호 로그인 / 회원가입 화면 (Java 백엔드 /api/auth/*)
 export default function LoginPage() {
@@ -20,6 +22,9 @@ export default function LoginPage() {
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [fieldErrors, setFieldErrors] = useState<LoginFormErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
+  // 만 14세 확인: 화면에서만 확인하고 가입 요청에 싣지 않는다(저장 안 함)
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+  const [ageError, setAgeError] = useState<string | undefined>();
   const [submitting, setSubmitting] = useState(false);
 
   const isSignup = mode === 'signup';
@@ -36,15 +41,19 @@ export default function LoginPage() {
     setFormError(null);
     setPassword('');
     setPasswordConfirm('');
+    setAgeConfirmed(false);
+    setAgeError(undefined);
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
     const errors = validateLoginForm({ email, password, passwordConfirm }, mode);
+    const ageProblem = isSignup ? validateAgeConfirm(ageConfirmed) : undefined;
     setFieldErrors(errors);
+    setAgeError(ageProblem);
     setFormError(null);
-    if (hasErrors(errors)) return;
+    if (hasErrors(errors) || ageProblem) return;
 
     setSubmitting(true);
     try {
@@ -127,6 +136,29 @@ export default function LoginPage() {
                 {fieldErrors.passwordConfirm}
               </p>
             )}
+
+            <label className="check-label confirm-check">
+              <input
+                id="age-confirm"
+                type="checkbox"
+                checked={ageConfirmed}
+                aria-required="true"
+                aria-invalid={ageError ? true : undefined}
+                aria-describedby={ageError ? 'age-confirm-error' : undefined}
+                onChange={(e) => {
+                  setAgeConfirmed(e.target.checked);
+                  setAgeError(undefined);
+                }}
+              />
+              <span>{PRIVACY_TEXT.ageCheck}</span>
+            </label>
+            {ageError && (
+              <p id="age-confirm-error" className="field-error">
+                <span aria-hidden="true">! </span>
+                {ageError}
+              </p>
+            )}
+            <PrivacyLink />
           </>
         )}
 

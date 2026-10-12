@@ -1,5 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ApiError, type User } from './lib/api';
 import { api, UNAUTHORIZED_EVENT } from './lib/client';
 import { clearToken, getToken, setToken, swTokenCopySettled, syncSwTokenCopy } from './lib/tokenStorage';
@@ -31,6 +31,9 @@ interface AuthContextValue {
   retry: () => void;
 }
 
+/** 로그인 없이 보는 공개 경로. 여기서는 401 을 받아도 토큰만 정리하고 /login 으로 보내지 않는다 */
+export const PUBLIC_PATHS: readonly string[] = ['/delete-account'];
+
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 /**
@@ -44,6 +47,9 @@ async function settleSwCopy(): Promise<void> {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const pathnameRef = useRef(pathname);
+  pathnameRef.current = pathname;
   const [status, setStatus] = useState<AuthStatus>(() => (getToken() ? 'loading' : 'signedOut'));
   const [user, setUser] = useState<User | null>(null);
   const [farewell, setFarewell] = useState(false);
@@ -90,7 +96,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void releaseWebDevice(false);
       setUser(null);
       setStatus('signedOut');
-      navigate('/login', { replace: true });
+      // 공개 경로(/delete-account)에서는 페이지를 그대로 둔다
+      if (!PUBLIC_PATHS.includes(pathnameRef.current)) navigate('/login', { replace: true });
     };
     window.addEventListener(UNAUTHORIZED_EVENT, onUnauthorized);
     return () => window.removeEventListener(UNAUTHORIZED_EVENT, onUnauthorized);

@@ -18,6 +18,7 @@ import {
 } from '../lib/petForm';
 import type { Pet, Species } from '../lib/petApi';
 import { PHOTO_HINT, validatePhoto } from '../lib/photo';
+import { PRIVACY_TEXT } from '../lib/privacyText';
 import { usePet } from '../pet';
 
 // 반려동물 등록(/pets/new, 온보딩 1/2) · 프로필 수정(/pet)
@@ -249,8 +250,12 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
             value={conditions}
             maxLength={PET_CONDITIONS_MAX}
             placeholder="예: 신부전, 심장병"
+            aria-describedby="pet-conditions-help"
             onChange={(e) => setConditions(e.target.value)}
           />
+          <p id="pet-conditions-help" className="muted">
+            {PRIVACY_TEXT.memoHelp}
+          </p>
 
           {isNew && (
             <PhotoPicker

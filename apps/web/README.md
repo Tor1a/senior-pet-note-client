@@ -43,7 +43,7 @@ npm run preview                   # → http://localhost:4173  (CORS 허용 주�
 
 - **웹 푸시 알림은 `npm run dev` 에서는 동작하지 않는다.** 개발 서버는 서비스워커를 등록하지 않아 FCM 토큰을 받을 수 없고, 알림을 켜도 서버에는 "등록된 기기 없음"(`no_device`)으로 남는다. 푸시를 확인하려면 위처럼 빌드 후 미리보기로 연다(`VITE_FIREBASE_*` 는 빌드할 때 들어가므로 `.env.local` 을 먼저 채운다).
 
-- 환경변수: `VITE_API_BASE_URL`, 개인정보 처리방침 주소 `VITE_PRIVACY_POLICY_URL`(비우면 계정·탈퇴 화면의 링크 줄이 숨겨진다. 스토어 심사 전 설정 필요), 알림용 `VITE_FIREBASE_*`. 주소 형식이 틀리면 **"환경변수 설정 필요"** 안내 화면이 뜬다.
+- 환경변수: `VITE_API_BASE_URL`, 개인정보 처리방침 주소 `VITE_PRIVACY_POLICY_URL`(비우면 계정·탈퇴 화면의 링크 줄이 숨겨진다. 스토어 심사 전 설정 필요), 알림용 `VITE_FIREBASE_*`, 계정 삭제 안내용 `VITE_SUPPORT_EMAIL`·`VITE_OPERATOR_NAME`·`VITE_RETENTION_NOTE`·`VITE_DELETE_REQUEST_NOTE`(아래 "개인정보 후속 조치"). 주소 형식이 틀리면 **"환경변수 설정 필요"** 안내 화면이 뜬다.
 - `VITE_` 로 시작하는 값은 브라우저에 그대로 공개되므로 비밀 값은 넣지 않는다. `.env*` 는 `.gitignore` 로 제외(`.env.example` 만 커밋).
 
 ## 백엔드 인증 계약 (웹이 기대하는 형식)
@@ -161,6 +161,14 @@ src/
   "특이사항 없음" 자동 해제, 투약 낙관적 업데이트·실패 롤백·409 동기화·취소, pet 404, 저장 400 안내, 서버 꺼짐, 이벤트 실패 무시.
 - `pages/PetFormPage.test.tsx` (18, 이름 30자 = UTF-16 길이 경계 포함): 반려동물 등록·수정 화면의 현재 동작 고정(검증 문구, 저장 본문, 400·연결 실패·409·404 처리, 중복 제출) — `lib/petForm.ts` 추출 전에 작성해 추출 후에도 그대로 통과한다. `lib/petForm.test.ts` (20, 한글 30/31자·이모지 15/16개). 사진 부분은 테스트하지 않는다.
 - `lib/todayForm.test.ts` (7), `lib/symptoms.test.ts` (6), `lib/api.test.ts` (10), `lib/loginForm.test.ts` (5), `lib/config.test.ts` (3).
+
+## 개인정보 후속 조치 (2026-10-12)
+- **만 14세 확인(가입 화면만):** 가입할 때 "만 14세 이상입니다." 체크가 필요하다(체크 없이 제출하면 칸 오류, 요청 안 나감). **클라이언트 전용이라 서버에 기록하지 않는다.** `POST /api/auth/signup` 본문은 그대로(이메일·비밀번호). 로그인 화면에는 없다. 처리방침 주소가 있으면 체크 아래에 링크를 둔다.
+- **`/delete-account`:** 로그인 없이 열리는 계정 삭제 안내 페이지(로그인 가드 밖, 서비스워커 SPA 폴백으로 직접 접속 가능). Google Play 의 "앱 밖 삭제 요청 링크"로 쓸 수 있다. 로그인해 있으면 계정 삭제 화면(`/account/delete`) 링크가 더 보인다. 환경변수(모두 비우면 해당 줄이 숨겨진다): `VITE_SUPPORT_EMAIL`(문의 이메일), `VITE_OPERATOR_NAME`(개발자·운영자명), `VITE_RETENTION_NOTE`(백업·서버 로그 보관 한 문장), `VITE_DELETE_REQUEST_NOTE`(이메일 요청 줄에 붙일 처리 기간·본인 확인 안내. 코드에 기본 문구가 없고 비면 숨김), `VITE_PRIVACY_POLICY_URL`. 이메일은 `? & , % ; #` 가 들어 있으면 형식 오류로 보고 버린다(mailto 쿼리 주입 방지).
+  삭제 범위 문구는 실제 동작대로 "서비스 데이터베이스에서는 즉시 삭제해요. 사진 파일은 이어서 지워요."로 한정했다(DB 삭제 커밋 뒤 사진 폴더 삭제, 사진 삭제가 실패해도 탈퇴는 성공 처리, 백업·로그 보관은 미정이라 단정하지 않음). 삭제 목록 끝에 "그 밖에 서비스 이용 중 쌓인 데이터(이용 기록, 알림 발송 기록 등)" 포괄 항목이 있다.
+  **401 처리:** 공개 경로(`auth.tsx` 의 `PUBLIC_PATHS`, 지금은 `/delete-account`)에서는 만료·무효 토큰으로 401 을 받아도 토큰만 정리하고 `/login` 으로 보내지 않는다(그 밖의 경로는 기존대로 이동).
+  **스토어 제출 전 체크:** `VITE_SUPPORT_EMAIL`(비었거나 형식이 틀리면 `npm run build` 때 `[경고]` 가 출력되지만 빌드는 계속된다. 개발 모드는 조용), `VITE_OPERATOR_NAME`, `VITE_RETENTION_NOTE`, `VITE_DELETE_REQUEST_NOTE`, `VITE_PRIVACY_POLICY_URL` 을 채운다.
+- **메모 안내:** 오늘 메모와 반려동물 폼의 질환 입력칸 아래에 "반려동물의 기록만 적어 주세요. 보호자 본인의 건강 정보는 적지 마세요." 가 항상 보인다(`aria-describedby`). 문구는 `lib/privacyText.ts`.
 
 ## 아직 안 한 것 / 알려진 한계
 
