@@ -58,7 +58,7 @@ const push = {
 async function renderToday() {
   await render(
     <PushContext.Provider value={push}>
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
         <TodayScreen />
       </PetContext.Provider>
     </PushContext.Provider>,
@@ -171,7 +171,7 @@ describe('오늘 화면 — 조회와 제안값', () => {
         : undefined,
     );
     await render(
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
         <TodayScreen />
       </PetContext.Provider>,
     );
@@ -303,7 +303,7 @@ describe('오늘 화면 — 오류 처리', () => {
   it('pet 404 면 반려동물 정보를 다시 읽는다', async () => {
     setup((r) => (r.url.endsWith('/today') ? json(404, { code: 'NOT_FOUND', message: 'x' }) : undefined));
     await render(
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
         <TodayScreen />
       </PetContext.Provider>,
     );
@@ -334,7 +334,7 @@ describe('오늘 화면 — 오류 처리', () => {
       throw new TypeError('Network request failed');
     }) as never;
     await render(
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
         <TodayScreen />
       </PetContext.Provider>,
     );
@@ -379,7 +379,7 @@ describe('오늘 화면 — 푸시로 열었을 때', () => {
     });
     await render(
       <PushContext.Provider value={push}>
-        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
           <TodayScreen />
         </PetContext.Provider>
       </PushContext.Provider>,
@@ -402,7 +402,7 @@ describe('오늘 화면 — 푸시로 열었을 때', () => {
     setup();
     const ui = () => (
       <PushContext.Provider value={push}>
-        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
           <TodayScreen />
         </PetContext.Provider>
       </PushContext.Provider>
@@ -457,7 +457,7 @@ describe('오늘 화면 — 푸시로 열었을 때', () => {
     });
     await render(
       <PushContext.Provider value={push}>
-        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
           <TodayScreen />
         </PetContext.Provider>
       </PushContext.Provider>,
@@ -476,7 +476,7 @@ describe('오늘 화면 — 푸시로 열었을 때', () => {
     });
     await render(
       <PushContext.Provider value={push}>
-        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
           <TodayScreen />
         </PetContext.Provider>
       </PushContext.Provider>,
@@ -515,7 +515,7 @@ describe('오늘 화면 — 알림이 가리킨 회차에만 강조·큰 버튼 
   const renderTwo = async () => {
     await render(
       <PushContext.Provider value={push}>
-        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+        <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
           <TodayScreen />
         </PetContext.Provider>
       </PushContext.Provider>,

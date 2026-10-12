@@ -5,13 +5,18 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, View, useWindowDimensions } from 'react-native';
-import { AppButton, AppText, Card, Screen } from '../components/ui';
+import { AppButton, AppText, Card, LinkButton, Screen } from '../components/ui';
 import { NoticeCard, NoticeTitle } from '../components/NoticeCard';
 import { ApiError, toUserMessage } from '../lib/api';
 import { DISCLAIMER } from '../lib/constants';
 import type { Medication } from '../lib/petApi';
 import type { Reminder } from '../lib/reminderApi';
+import { PetAvatar } from '../pet/PetAvatar';
+import { PetUpdatedNotice } from '../pet/PetNotices';
+import { entryLinkLabel, PET_TEXT, updatedTitle } from '../pet/petText';
 import { usePet } from '../pet/PetProvider';
+import { editPetHref } from '../pet/routes';
+import { usePetNotice } from '../pet/usePetNotice';
 import { cannotReceive, usePush } from '../push/pushContext';
 import { petApi, reminderApi } from '../services/client';
 import { colors } from '../theme';
@@ -32,6 +37,8 @@ import {
 import { MedicationCard } from './sections/MedicationCard';
 import { ScreenTop } from './ScreenTop';
 
+const PET_NOTICE_KINDS = ['petUpdated'] as const;
+
 type Notice = { kind: ListNoticeKind | 'deleted' | 'deleted-gone'; medId?: string; name?: string };
 
 export default function MedicationsScreen() {
@@ -41,6 +48,9 @@ export default function MedicationsScreen() {
   const { fontScale } = useWindowDimensions();
   const params = useLocalSearchParams<{ notice?: string; medId?: string }>();
 
+  const petNameRef = useRef('');
+  petNameRef.current = pet?.name ?? '';
+  const { notice: petNotice, dismiss: dismissPetNotice } = usePetNotice(PET_NOTICE_KINDS, () => updatedTitle(petNameRef.current));
   const [meds, setMeds] = useState<Medication[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -152,6 +162,20 @@ export default function MedicationsScreen() {
         title="먹이는 약"
         lead="약을 추가하거나 고칠 수 있어요."
       />
+
+      {pet ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <PetAvatar name={pet.name} size={40} />
+          <AppText style={{ fontWeight: '700', flexShrink: 1 }}>{pet.name}</AppText>
+          <LinkButton
+            label={PET_TEXT.entryLink}
+            accessibilityLabel={entryLinkLabel(pet.name)}
+            onPress={() => router.push(editPetHref('medications') as never)}
+          />
+        </View>
+      ) : null}
+
+      {petNotice === 'petUpdated' && pet ? <PetUpdatedNotice name={pet.name} onDismiss={dismissPetNotice} /> : null}
 
       {loadError ? (
         <Card>

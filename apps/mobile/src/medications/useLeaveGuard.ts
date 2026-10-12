@@ -8,10 +8,13 @@
 import { useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-export function useLeaveGuard(dirty: boolean) {
+// - blocked(예: 저장 중): 확인 카드 없이 이동만 막는다. 카드는 "저장하지 않고 나갈까요?"라 저장 중에는 오해를 부른다.
+export function useLeaveGuard(dirty: boolean, blocked = false) {
   const navigation = useNavigation();
   const dirtyRef = useRef(dirty);
   dirtyRef.current = dirty;
+  const blockedRef = useRef(blocked);
+  blockedRef.current = blocked;
   const bypass = useRef(false);
   const [pending, setPending] = useState<{ run: () => void } | null>(null);
 
@@ -33,7 +36,12 @@ export function useLeaveGuard(dirty: boolean) {
       preventDefault: () => void;
       data: { action: unknown };
     }) => {
-      if (bypass.current || !dirtyRef.current) return;
+      if (bypass.current) return;
+      if (blockedRef.current) {
+        e.preventDefault();
+        return;
+      }
+      if (!dirtyRef.current) return;
       e.preventDefault();
       const action = e.data.action;
       setPending({ run: () => withoutGuard(() => navigation.dispatch(action as never)) });
@@ -44,6 +52,7 @@ export function useLeaveGuard(dirty: boolean) {
   /** 화면 안 버튼으로 떠날 때: 고친 내용이 있으면 확인 카드, 없으면 바로 간다 */
   const guard = useCallback(
     (go: () => void) => {
+      if (blockedRef.current) return;
       if (dirtyRef.current) setPending({ run: () => withoutGuard(go) });
       else go();
     },

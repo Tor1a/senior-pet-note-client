@@ -15,6 +15,7 @@ mobile/
 │  │  ├─ index.tsx       "오늘" 라우트(PetGate → TodayScreen). 얇게 유지
 │  │  ├─ login.tsx       로그인
 │  │  ├─ signup.tsx      회원가입
+│  │  ├─ pet/            new.tsx(/pet/new 등록, PetGate 밖) · edit.tsx(/pet/edit?from=today|medications|account 수정, PetGate 안)
 │  │  └─ medications/    약 관리 라우트(모두 PetGate → 화면, 얇게 유지)
 │  │     ├─ index.tsx            /medications            약 목록
 │  │     ├─ new.tsx              /medications/new        약 등록
@@ -22,7 +23,8 @@ mobile/
 │  ├─ medications/       MedicationsScreen(목록·삭제·알림 상태 줄), MedicationFormScreen(등록·수정), ReminderScreen(알림 설정),
 │  │                     sections/(MedicationCard·ReminderStatusLine·TimeRow·SwitchRow·RepeatSection·PeriodSection·DeviceCard·PermissionModal),
 │  │                     routes.ts(경로·안내 코드), layout.ts(큰 글씨 배치 기준), useLeaveGuard.ts(저장 안 한 변경 확인), ScreenTop.tsx
-│  ├─ pet/               PetProvider(GET /api/pets 첫 번째), PetGate(없음·오류·로딩 안내)
+│  ├─ pet/               PetProvider(GET /api/pets 첫 번째 + setPet), PetGate(없음→PetStart·오류·로딩), PetStart(시작 화면), PetFormScreen(등록·수정 폼),
+│  │                     YearSheet(태어난 해 목록 시트), PetAvatar(이름 첫 글자 원), PetNotices·usePetNotice(돌아온 뒤 안내 카드), petText(문구·금지어 검사), routes.ts
 │  ├─ today/             TodayScreen(상태·API·타이머·AppState) + sections/(표시 전용: 헤더·투약·식사/물·증상·체중·메모·저장 바·알림 카드/로그아웃)
 │  ├─ push/              pushContext.ts(Context·usePush·usePushMessages·bannerVisible), PushProvider.tsx(배너)
 │  ├─ testing/           컴포넌트 테스트용 가짜 client·계약 예시 JSON
@@ -84,7 +86,19 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 날짜·시각 선택은 `@react-native-community/datetimepicker` 9.1.0(SDK 57 번들 버전). Android 는 시스템 대화상자, iOS 는 하단 시트(휠/달력)에서 [완료]를 눌러야 반영된다. 웹 미리보기에서는 글자 입력칸으로 대신한다.
 - **네이티브 모듈이 추가됐으므로 개발 빌드를 한 번 다시 만들어야 한다**(Expo Go 에는 포함돼 있어 그대로 된다): `export JAVA_HOME=$(/usr/libexec/java_home -v 21)`(macOS, JDK 25 는 CMake 단계에서 실패) 후 `CI=1 npx expo run:android`(Windows 는 JDK 21 경로를 `JAVA_HOME` 으로). 이 PC 에서 로컬로만 빌드하며 EAS 는 쓰지 않았다.
 - 화면 사이 안내는 라우트 파라미터 `notice` 에 고정 코드(created/updated/gone)만 싣고, 약 이름은 목록이 불러온 목록에서 `medId` 로 찾는다.
-- 알려진 한계: iOS 확인 못 함(장비 없음). Android 에뮬레이터에서 글자 200% 화면은 눈으로 확인했으나 TalkBack 등 스크린리더 동작은 미확인. 온보딩(`?onboarding=1`)은 만들지 않았다(앱에 반려동물 등록 화면이 없음).
+- 알려진 한계: iOS 확인 못 함(장비 없음). Android 에뮬레이터에서 글자 200% 화면은 눈으로 확인했으나 TalkBack 등 스크린리더 동작은 미확인. 온보딩(`?onboarding=1`)은 만들지 않았다(반려동물 등록 후에는 오늘 화면의 약 등록 안내 카드로 잇는다).
+
+## 반려동물 등록·수정 — 1단계, 사진 제외 (2026-10-12)
+- 설계 `.company/design/모바일-반려동물-등록.md`, 기획 `.company/plans/모바일-반려동물-등록.md`. 백엔드 변경 없음(`POST/PUT/GET /api/pets` 기존).
+- 반려동물이 없으면 `PetGate` 가 모든 화면(오늘·약 관리·지난 기록·리포트)에서 같은 **시작 화면**(`PetStart`: [반려동물 등록하기], 웹에서 이미 등록했다면 [다시 확인하기], [계정], [로그아웃])을 보인다. 알림 받기 카드는 숨긴다(`DeviceFooter compact`).
+- 등록 `/pet/new`(PetGate 밖): 이름(1~30자)·종류(큰 버튼 2개, 기본 선택 없음)·태어난 해(목록 시트 + [완료]/[취소], 새 네이티브 모듈 없음)·앓고 있는 질환(200자, 줄바꿈은 공백으로). 성공하면 오늘로 `dismissTo`(폼이 스택에 안 남음) + "OO를/을 등록했어요."(`withParticle` 로 받침에 맞는 조사) 카드와 약 등록 안내(한 번만, 닫으면 끝). 웹의 약 관리 2/2 온보딩은 만들지 않았다.
+- 리뷰·QA 수정(2026-10-12): (1) `/pet/new` 직접 진입(콜드 스타트·딥링크)은 반려동물 확인 중(`loading`)이면 로딩만 보이고, 이미 있으면(`ready`) 폼 없이 오늘로 `replace`, `none`·`offline`·`error` 로 확정된 뒤에만 폼. (2) 저장 중 시스템 뒤로·스와이프는 확인 카드 없이 막기만 한다(`useLeaveGuard(dirty, blocked)`). (3) 409/404 뒤 `PetProvider.reload({ keepOnError })` 가 성공 여부(boolean)를 돌려주고, 실패하면 이동하지 않고 폼에 머물며 "반려동물 정보를 다시 확인하지 못했어요." + [다시 시도](저장을 되풀이하지 않고 다시 읽기만). (4) "빠진 곳이 있어요" 요약은 칸별 오류를 모두 고치면 사라진다. (5) 수정·이미 등록됨·정보 없음 안내 카드에 [닫기]가 있다. 약 이름이 들어가는 약 관리 쪽 `을(를)` 문구는 이번 범위 밖이라 그대로다.
+- 수정 `/pet/edit?from=…`: 오늘 맨 아래 [반려동물 정보], 약 관리 제목 아래 줄 [정보 고치기 ›], 계정 맨 위 `반려동물` 카드의 [정보 고치기]. 저장하면 들어왔던 화면으로 돌아가 "OO 정보를 고쳤어요." 카드. 고친 채 뒤로·스와이프·버튼으로 나가면 "저장하지 않고 나갈까요?"(`useLeaveGuard`).
+- 오류: 이름/종류 빠짐은 칸 아래 `! 문구` + 버튼 위 요약, 400·연결 실패는 기존 `toUserMessage(…,'pet')` + "입력한 내용은 그대로 있어요.", 409 `PET_LIMIT_REACHED` 는 다시 읽고 오늘로 + "이미 등록된 반려동물이 있어요…", 수정 중 404 는 시작 화면 + "등록된 반려동물 정보를 찾지 못했어요…". 401 은 조용히(AuthContext 가 로그인 화면으로). 저장 중에는 입력·뒤로 잠금, 중복 제출은 `useRef` 가드.
+- 화면 사이 안내는 `notice` 파라미터에 고정 코드(`petCreated`/`petUpdated`/`petLimit`/`petGone`)만 싣고, 이름은 `PetProvider` 의 pet 에서 읽는다(앱을 다시 열면 사라짐). 약 관리의 `created/updated/gone` 과 섞이지 않는다.
+- 공유 사본 `lib/petForm.ts`(검증·본문 변환·오류 분류, 웹 `PetFormPage` 에서 추출) + 테스트. 문구는 모바일 전용 `pet/petText.ts`(금지어 검사 `findPetForbidden()`).
+- **사진은 2단계로 보류**: 사진 선택·업로드·표시·삭제는 만들지 않았다(`expo-image-picker` 미설치, `Image` 로 인증 사진 표시 안 함). 웹에서 올린 사진도 앱에서는 이름 첫 글자 원으로 보이고, 수정 폼에 "사진은 지금은 웹에서만 바꿀 수 있어요." 한 줄이 있다. 2단계는 `PetAvatar` 안쪽과 `PetFormScreen` 의 `PHOTO_SLOT` 자리만 바꾸면 되며, **`expo-image-picker` 설치(네이티브)와 개발 빌드 재생성이 필요해 대표님 승인 후** 진행한다.
+- 확인하지 못한 것(실기기 필요, 2단계 7개 항목과 함께 보류): 화면은 jest 로만 확인했다. 실제 키보드 동작·글자 200% 모양·VoiceOver/TalkBack 읽기·태어난 해 시트 스크롤 위치·iOS.
 
 ## 지난 기록 보기·체중 그래프 (2026-10-08)
 - 오늘 화면의 [약 관리 ›] 옆 [지난 기록 보기 ›](약이 없어도 보임, 글자 1.3배 이상이면 세로로 쌓임)에서 들어간다. 라우트: `/history`(H1), `/history/[recordDate]`(H2, 읽기 전용, 전날/다음 날은 `replace`).
@@ -126,7 +140,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
 - 401 을 받으면 토큰을 지우고 로그인 화면으로. 서버에 연결하지 못하면 토큰을 유지한다(오프라인 때마다 로그아웃되지 않게).
 - 로그아웃 API 는 없다(refresh 토큰 없음). 기기에서 토큰만 지운다.
-- 계정 관리(`src/account/`, 라우트 `/account`·`/account/password`·`/account/delete`): 오늘 맨 아래·반려동물 없음 안내 화면의 [계정] 버튼으로 진입. 비밀번호 변경 성공 시 `AuthContext.replaceToken` 으로 새 토큰 즉시 교체, 탈퇴 204 후 `finishWithdrawal`(서버 기기 해제 없이 FCM·토큰·설정 정리 → 로그인 화면에 탈퇴 안내). 400 `CURRENT_PASSWORD_MISMATCH` 는 강제 로그아웃하지 않는다. 공유 사본: `accountApi/accountForm/privacyConfig`.
+- 계정 관리(`src/account/`, 라우트 `/account`·`/account/password`·`/account/delete`): 오늘 맨 아래·반려동물 없음 시작 화면의 [계정] 버튼으로 진입. 비밀번호 변경 성공 시 `AuthContext.replaceToken` 으로 새 토큰 즉시 교체, 탈퇴 204 후 `finishWithdrawal`(서버 기기 해제 없이 FCM·토큰·설정 정리 → 로그인 화면에 탈퇴 안내). 400 `CURRENT_PASSWORD_MISMATCH` 는 강제 로그아웃하지 않는다. 공유 사본: `accountApi/accountForm/privacyConfig`.
 
 ## 공유 패키지 통합 계획
 현재 `src/lib/` 의 아래 파일은 `web/src/lib/` 의 **사본**이다. 파일 상단에 동기화 필요 주석이 있다.
@@ -145,9 +159,10 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 | reminderApi.ts | 알림 규칙·기기 토큰 API 계약 타입과 createReminderApi | (화면 테스트로 확인) |
 | reminderForm.ts | 알림 설정 입력 상태↔PUT 본문, 검증, 요약·다음 알림·상태 줄 문구, `buildSaveBody`·`saveMessage`·`reminderStatusLabel` | reminderForm.test.ts · reminderForm.edge.test.ts (웹 테스트 사본) |
 | medicationForm.ts | 약 등록·수정 입력 검증·본문 변환·시각 추가/삭제 | medicationForm.test.ts (웹 테스트 사본) |
+| petForm.ts | 반려동물 등록·수정 입력 검증·본문 변환·변경 여부·저장 오류 분류(사진 제외) | petForm.test.ts (웹 테스트 사본) |
 
 - 모바일 전용(services/): config, tokenStorage, client — 플랫폼마다 달라 사본으로 두지 않는다.
-- 웹에만 있고 아직 안 가져온 파일: photo (사진 화면을 만들 때 가져온다).
+- 웹에만 있고 아직 안 가져온 파일: photo (사진 화면을 만들 때 가져온다 — 사진은 2단계로 보류).
 - 기록 날짜(새벽 4시 기준)·제안값·안내 문구는 서버가 계산한다. 앱에서 따로 계산하지 않는다.
 - 사본은 2026-10-08 에 웹 원본과 다시 맞췄다(헤더 주석 외 동일. reminderForm·medicationForm 은 이날 새로 가져옴).
 - 웹 테스트 사본은 `import ... from 'vitest'` 한 줄을 빼고 `vi.fn` → `jest.fn` 만 바꿨다(Jest 전역 함수로 그대로 돈다).
@@ -161,10 +176,10 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 
 ## 앞으로 할 일
 1. (완료) "오늘" 화면 본구현. 남은 확인: 실기기 키보드·글자 200%·점선 테두리, 시뮬레이터 터치 시나리오(자동화 도구 없어 미확인).
-2. 반려동물 등록·선택, 사진 업로드(`expo-image-picker`, MVP 결정 2).
+2. (1단계 완료) 반려동물 등록·수정. **남은 것: 사진 업로드(2단계, `expo-image-picker` — 네이티브 모듈이라 대표님 승인과 개발 빌드 재생성 필요).**
 3. **푸시 알림(투약 알림):** `@react-native-firebase/messaging` 으로 구현됨. 알림 규칙(켜기/끄기·매일/요일/N일 간격·기간)은 앱의 약 관리 → 알림 설정 화면에서 정한다(웹과 같은 기능). 개발 빌드(`npx expo prebuild` + `npx expo run:android`)와 `google-services.json`(앱 루트, git 제외, 패키지명 `com.oraegyeot.seniorpet`)이 필요하다. Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 알림만 꺼진다. 플랫폼별로 따로 판단하며 한쪽 파일만 있으면 경고를 출력하고 그쪽만 켠다. **EAS 클라우드 빌드**는 git 에 없는 설정 파일이 올라가지 않으므로 file secret 으로 넣는다: `eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`(iOS 는 `GOOGLE_SERVICE_INFO_PLIST`). app.config.ts 가 이 환경변수 경로를 읽는다. iOS 는 `GoogleService-Info.plist` + APNs 키 + Apple 개발자 팀 필요(미검증).
 4. `packages/shared` 통합 (위 계획).
-5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 654개·54 스위트(2026-10-12 알림에서 바로 체크·QA 추가 후).
+5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 837개·63 스위트(2026-10-12 반려동물 등록·수정 1단계 + 리뷰·QA 수정 후).
    jest 의 기본 글자 배율(fontScale)은 2 라서 평소 배치를 볼 때는 `testing/fontScale.ts` 의 `setFontScale(1)` 을 쓴다. expo-router·선택기는 `testing/mockRouter.ts`·`testing/mockDateTimePicker.tsx` 로 대체한다.
 6. 운영 API 는 반드시 `https://` 로. 정식(릴리스) 빌드의 안드로이드는 기본적으로 `http://` 통신을 막는다.
 

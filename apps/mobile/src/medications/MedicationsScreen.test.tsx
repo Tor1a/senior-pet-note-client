@@ -38,7 +38,7 @@ const push = (s: PushDeviceState) => ({
 async function renderList(pushState: PushDeviceState = 'registered') {
   await render(
     <PushContext.Provider value={push(pushState)}>
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
         <MedicationsScreen />
       </PetContext.Provider>
     </PushContext.Provider>,
@@ -286,5 +286,26 @@ describe('약 목록 — 다른 화면에서 돌아온 안내', () => {
     expect(mockRouter.push).toHaveBeenLastCalledWith('/medications/med-2/edit');
     await fireEvent.press(screen.getByRole('button', { name: '아조딜 고치기' }));
     expect(mockRouter.push).toHaveBeenLastCalledWith('/medications/med-1/edit');
+  });
+});
+
+describe('약 관리 — 반려동물 줄(수정 진입점)', () => {
+  it('제목 아래에 아바타 + 이름 + [정보 고치기 ›](접근성 "보리 정보 고치기") 가 있고 /pet/edit?from=medications 로 간다', async () => {
+    setup();
+    await renderList();
+    expect(screen.getByTestId('pet-avatar', { includeHiddenElements: true })).toBeTruthy();
+    expect(screen.getByText('보리')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: '보리 정보 고치기' }));
+    expect(mockRouter.push).toHaveBeenLastCalledWith('/pet/edit?from=medications');
+  });
+
+  it('수정 저장 뒤(petUpdated)에는 "보리 정보를 고쳤어요." 카드를 보이고 약 목록 안내와 섞이지 않는다', async () => {
+    state.params = { notice: 'petUpdated' };
+    setup();
+    await renderList();
+    expect(screen.getByText('✓ 보리 정보를 고쳤어요.')).toBeTruthy();
+    expect(screen.queryByText(/목록에서 뺀 약/)).toBeNull();
+    await fireEvent.press(screen.getByRole('button', { name: '닫기' }));
+    expect(screen.queryByText('✓ 보리 정보를 고쳤어요.')).toBeNull();
   });
 });

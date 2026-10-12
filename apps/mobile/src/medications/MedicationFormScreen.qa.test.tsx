@@ -29,7 +29,7 @@ function setup(routes: Record<string, H> = {}) {
 
 async function renderForm(id?: string) {
   await render(
-    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
       <MedicationFormScreen id={id} />
     </PetContext.Provider>,
   );

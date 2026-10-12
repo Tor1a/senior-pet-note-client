@@ -62,7 +62,11 @@ import { isLargeFont } from '../medications/layout';
 import { REPORT_TEXT } from '../lib/reportText';
 import { REPORT_HREF } from '../report/routes';
 import { MEDICATIONS_HREF, NEW_MEDICATION_HREF } from '../medications/routes';
+import { PetCreatedNotice, PetInfoNotice, PetUpdatedNotice } from '../pet/PetNotices';
 import { usePet } from '../pet/PetProvider';
+import { editPetHref } from '../pet/routes';
+import { usePetNotice } from '../pet/usePetNotice';
+import { createdTitle, PET_TEXT, updatedTitle } from '../pet/petText';
 import { usePushMessages } from '../push/pushContext';
 import { petApi } from '../services/client';
 import { readPreferMl, writePreferMl } from '../services/preferences';
@@ -87,14 +91,23 @@ type DailyNotice =
 export const RESYNC_MIN_INTERVAL_MS = 30_000;
 export const DATE_CHANGED_NOTICE = '새 날짜가 되어 화면을 새로 불러왔어요.';
 
+const PET_NOTICE_KINDS = ['petCreated', 'petUpdated', 'petLimit'] as const;
+
 export default function TodayScreen() {
   const { pet, reload: reloadPet } = usePet();
+  const petNameRef = useRef('');
+  petNameRef.current = pet?.name ?? '';
   const params = useLocalSearchParams<{ source?: string; med?: string; t?: string; d?: string; n?: string }>();
   const router = useRouter();
   const goManage = useCallback(() => router.push(MEDICATIONS_HREF as never), [router]);
   const goHistory = useCallback(() => router.push(HISTORY_HREF as never), [router]);
   const goReport = useCallback(() => router.push(REPORT_HREF as never), [router]);
   const goAddMedication = useCallback(() => router.push(NEW_MEDICATION_HREF as never), [router]);
+  const goEditPet = useCallback(() => router.push(editPetHref('today') as never), [router]);
+  // 등록·수정 화면이 돌아오며 실어 준 안내(등록 직후 약 등록 카드, 수정 완료, 이미 등록됨)
+  const { notice: petNotice, dismiss: dismissPetNotice } = usePetNotice(PET_NOTICE_KINDS, (k) =>
+    k === 'petUpdated' ? updatedTitle(petNameRef.current) : k === 'petLimit' ? PET_TEXT.limit : createdTitle(petNameRef.current),
+  );
 
   const [today, setToday] = useState<TodayResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -639,6 +652,17 @@ export default function TodayScreen() {
         />
       }
     >
+      {petNotice === 'petCreated' ? (
+        <PetCreatedNotice
+          name={name}
+          showMedication={!today || today.doses.length === 0}
+          onAddMedication={goAddMedication}
+          onDismiss={dismissPetNotice}
+        />
+      ) : null}
+      {petNotice === 'petUpdated' ? <PetUpdatedNotice name={name} onDismiss={dismissPetNotice} /> : null}
+      {petNotice === 'petLimit' ? <PetInfoNotice kind="petLimit" onDismiss={dismissPetNotice} /> : null}
+
       <TodayHeader
         dateText={today ? formatRecordDate(today.recordDate) : '오늘'}
         petName={name}
@@ -786,7 +810,7 @@ export default function TodayScreen() {
         </>
       )}
 
-      <DeviceFooter onManage={goManage} />
+      <DeviceFooter onManage={goManage} onEditPet={goEditPet} />
     </Screen>
   );
 }

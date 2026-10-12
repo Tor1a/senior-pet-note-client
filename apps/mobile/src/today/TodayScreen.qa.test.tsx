@@ -51,7 +51,7 @@ const push = {
 const reloadPet = jest.fn();
 const tree = (pet: typeof PET | null = PET) => (
   <PushContext.Provider value={push}>
-    <PetContext.Provider value={{ status: 'ready', pet, reload: reloadPet }}>
+    <PetContext.Provider value={{ status: 'ready', pet, reload: reloadPet, setPet: jest.fn() }}>
       <TodayScreen />
     </PetContext.Provider>
   </PushContext.Provider>

@@ -1,20 +1,32 @@
 // 계정 (/account): 로그인한 이메일, 비밀번호 바꾸기, 로그아웃, 회원 탈퇴 진입 (설계 3장)
 // 면책 문구는 이 화면에만 둔다(설계 7-1). 하단 고정 영역 없이 전부 스크롤 → 글자 200% 에서도 잘리지 않는다.
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { View } from 'react-native';
 import { useAuth } from '../auth/AuthContext';
 import { NoticeCard, NoticeTitle } from '../components/NoticeCard';
 import { AppButton, AppText, Card, Screen } from '../components/ui';
 import { DISCLAIMER } from '../lib/constants';
 import { goBackOr } from '../medications/routes';
+import { PetAvatar } from '../pet/PetAvatar';
+import { PetUpdatedNotice } from '../pet/PetNotices';
+import { PET_TEXT, petSummary, updatedTitle } from '../pet/petText';
+import { usePet } from '../pet/PetProvider';
+import { editPetHref } from '../pet/routes';
+import { usePetNotice } from '../pet/usePetNotice';
 import { ScreenTop } from '../medications/ScreenTop';
 import { colors } from '../theme';
 import { PrivacyLink } from './AccountParts';
 import { DELETE_ACCOUNT_HREF, isPasswordNotice, PASSWORD_HREF } from './routes';
 
+const PET_NOTICE_KINDS = ['petUpdated'] as const;
+
 export default function AccountScreen() {
   const router = useRouter();
+  const { pet } = usePet();
+  const petNameRef = useRef('');
+  petNameRef.current = pet?.name ?? '';
+  const { notice: petNotice, dismiss: dismissPetNotice } = usePetNotice(PET_NOTICE_KINDS, () => updatedTitle(petNameRef.current));
   const { user, signOut } = useAuth();
   const { notice } = useLocalSearchParams<{ notice?: string }>();
   const [signingOut, setSigningOut] = useState(false);
@@ -27,6 +39,24 @@ export default function AccountScreen() {
         <NoticeCard kind="ok">
           <NoticeTitle ok>비밀번호를 바꿨어요.</NoticeTitle>
         </NoticeCard>
+      ) : null}
+
+      {petNotice === 'petUpdated' && pet ? <PetUpdatedNotice name={pet.name} onDismiss={dismissPetNotice} /> : null}
+
+      {pet ? (
+        <Card>
+          <AppText variant="secondary" accessibilityRole="header">
+            {PET_TEXT.accountCardTitle}
+          </AppText>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <PetAvatar name={pet.name} size={64} />
+            <View style={{ flexShrink: 1 }}>
+              <AppText style={{ fontWeight: '700' }}>{pet.name}</AppText>
+              <AppText variant="secondary">{petSummary(pet.species, pet.birthYear)}</AppText>
+            </View>
+          </View>
+          <AppButton label={PET_TEXT.entryLinkPlain} variant="secondary" onPress={() => router.push(editPetHref('account') as never)} />
+        </Card>
       ) : null}
 
       <Card>

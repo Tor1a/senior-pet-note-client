@@ -1,7 +1,9 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { setFontScale } from '../testing/fontScale';
-import { json } from '../testing/fixtures';
-import { mockRouter, resetRouterMocks } from '../testing/mockRouter';
+import { json, PET } from '../testing/fixtures';
+import { mockRouter, resetRouterMocks, state } from '../testing/mockRouter';
+import { PetContext } from '../pet/PetProvider';
+import type { Pet } from '../lib/petApi';
 import { PushContext } from '../push/pushContext';
 import AccountScreen from './AccountScreen';
 import AccountDeleteScreen from './AccountDeleteScreen';
@@ -26,7 +28,14 @@ const push = {
   bannerVisible: false,
   subscribe: () => () => {},
 };
-const wrap = (node: React.ReactElement) => <PushContext.Provider value={push}>{node}</PushContext.Provider>;
+let mockPet: Pet | null = null;
+const wrap = (node: React.ReactElement) => (
+  <PushContext.Provider value={push}>
+    <PetContext.Provider value={{ status: mockPet ? 'ready' : 'none', pet: mockPet, reload: jest.fn(), setPet: jest.fn() }}>
+      {node}
+    </PetContext.Provider>
+  </PushContext.Provider>
+);
 
 type Req = { url: string; method: string; body: any };
 let calls: Req[] = [];
@@ -43,6 +52,7 @@ beforeEach(() => {
   setFontScale(1);
   calls = [];
   mockAuth.user = { id: 'u1', email: 'owner@example.com' };
+  mockPet = null;
   mockAuth.signOut.mockReset();
   mockAuth.replaceToken.mockClear();
   mockAuth.finishWithdrawal.mockClear();
@@ -78,6 +88,39 @@ describe('계정 화면', () => {
     await render(wrap(<AccountScreen />));
     expect(screen.getByRole('button', { name: '회원 탈퇴' })).toBeTruthy();
     expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy();
+  });
+});
+
+describe('계정 화면 — 반려동물 카드', () => {
+  it('반려동물이 없으면 카드가 없다', async () => {
+    await render(wrap(<AccountScreen />));
+    expect(screen.queryByText('반려동물')).toBeNull();
+    expect(screen.queryByRole('button', { name: '정보 고치기' })).toBeNull();
+  });
+
+  it('있으면 아바타·이름·"개 · 2012년생"과 [정보 고치기](from=account)를 보인다. 해가 없으면 종류만', async () => {
+    mockPet = PET;
+    const { unmount } = await render(wrap(<AccountScreen />));
+    expect(screen.getByText('반려동물')).toBeTruthy();
+    expect(screen.getByText('보리')).toBeTruthy();
+    expect(screen.getByText('개 · 2012년생')).toBeTruthy();
+    expect(screen.getByTestId('pet-avatar', { includeHiddenElements: true })).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: '정보 고치기' }));
+    expect(mockRouter.push).toHaveBeenCalledWith('/pet/edit?from=account');
+    await unmount();
+    mockPet = { ...PET, species: 'cat', birthYear: null };
+    await render(wrap(<AccountScreen />));
+    expect(screen.getByText('고양이')).toBeTruthy();
+  });
+
+  it('수정 저장 뒤 돌아오면 "정보를 고쳤어요." 카드를 한 번 보이고 파라미터를 지운다', async () => {
+    mockPet = PET;
+    state.params = { notice: 'petUpdated' };
+    await render(wrap(<AccountScreen />));
+    expect(screen.getByText('✓ 보리 정보를 고쳤어요.')).toBeTruthy();
+    expect(mockRouter.setParams).toHaveBeenCalledWith({ notice: undefined });
+    await fireEvent.press(screen.getByRole('button', { name: '닫기' }));
+    expect(screen.queryByText('✓ 보리 정보를 고쳤어요.')).toBeNull();
   });
 });
 

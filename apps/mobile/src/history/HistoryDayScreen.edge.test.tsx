@@ -23,7 +23,7 @@ function setup(handler: () => Response) {
 
 async function renderDay(recordDate: string | undefined) {
   await render(
-    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
       <HistoryDayScreen recordDate={recordDate} />
     </PetContext.Provider>,
   );

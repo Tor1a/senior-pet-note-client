@@ -79,3 +79,35 @@ describe('오늘 화면 하단 — 알림 카드와 약 관리 진입', () => {
     expect(names).toEqual(['약 관리 · 알림 설정', '계정', '로그아웃']);
   });
 });
+
+describe('반려동물 정보 진입과 compact(시작 화면)', () => {
+  async function renderWith(props: React.ComponentProps<typeof DeviceFooter>, state: PushDeviceState = 'default') {
+    await render(
+      <PushContext.Provider value={push(state)}>
+        <DeviceFooter {...props} />
+      </PushContext.Provider>,
+    );
+  }
+
+  it('onEditPet 이 있으면 [반려동물 정보]가 [약 관리 · 알림 설정] 아래, [계정] 위에 있고 누르면 onEditPet', async () => {
+    const onEditPet = jest.fn();
+    await renderWith({ onManage: jest.fn(), onEditPet }, 'registered');
+    const names = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel);
+    expect(names).toEqual(['약 관리 · 알림 설정', '반려동물 정보', '계정', '로그아웃']);
+    await fireEvent.press(screen.getByRole('button', { name: '반려동물 정보' }));
+    expect(onEditPet).toHaveBeenCalledTimes(1);
+  });
+
+  it('onEditPet 이 없으면 [반려동물 정보]가 없다', async () => {
+    await renderWith({ onManage: jest.fn() }, 'registered');
+    expect(screen.queryByRole('button', { name: '반려동물 정보' })).toBeNull();
+  });
+
+  it('compact 는 알림 받기 카드만 숨기고 [계정]·로그아웃은 남긴다', async () => {
+    await renderWith({ compact: true });
+    expect(screen.queryByText('투약 알림 받기')).toBeNull();
+    expect(screen.queryByRole('button', { name: '알림 받기' })).toBeNull();
+    expect(screen.getByRole('button', { name: '계정' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '로그아웃' })).toBeTruthy();
+  });
+});

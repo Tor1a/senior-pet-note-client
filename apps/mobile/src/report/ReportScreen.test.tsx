@@ -54,7 +54,7 @@ function setup(handlers: { history?: () => Response; meds?: () => Response } = {
 
 async function renderScreen() {
   await render(
-    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
       <ReportScreen />
     </PetContext.Provider>,
   );

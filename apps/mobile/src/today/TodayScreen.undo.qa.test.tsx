@@ -48,7 +48,7 @@ const push = {
 async function renderToday() {
   await render(
     <PushContext.Provider value={push}>
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: jest.fn() }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: jest.fn(), setPet: jest.fn() }}>
         <TodayScreen />
       </PetContext.Provider>
     </PushContext.Provider>,

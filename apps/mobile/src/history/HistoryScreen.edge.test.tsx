@@ -51,7 +51,7 @@ function setup(handler: () => Response | Promise<Response>) {
 
 async function renderScreen() {
   await render(
-    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+    <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
       <HistoryScreen />
     </PetContext.Provider>,
   );

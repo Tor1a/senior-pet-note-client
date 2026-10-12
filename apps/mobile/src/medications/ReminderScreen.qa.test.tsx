@@ -45,7 +45,7 @@ const pv = (s: PushDeviceState, o: Partial<PushContextValue> = {}): PushContextV
 async function renderScreen(p: PushContextValue) {
   await render(
     <PushContext.Provider value={p}>
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: jest.fn() }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: jest.fn(), setPet: jest.fn() }}>
         <ReminderScreen id="med-1" />
       </PetContext.Provider>
     </PushContext.Provider>,

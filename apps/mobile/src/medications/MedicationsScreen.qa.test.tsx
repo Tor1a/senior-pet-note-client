@@ -31,7 +31,7 @@ async function renderList() {
     <PushContext.Provider
       value={{ state: 'registered', requestPermission: jest.fn(), recheck: jest.fn(), bannerVisible: false, subscribe: () => () => {} } as never}
     >
-      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet }}>
+      <PetContext.Provider value={{ status: 'ready', pet: PET, reload: reloadPet, setPet: jest.fn() }}>
         <MedicationsScreen />
       </PetContext.Provider>
     </PushContext.Provider>,

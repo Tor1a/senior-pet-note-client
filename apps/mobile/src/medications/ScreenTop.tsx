@@ -8,16 +8,19 @@ export function ScreenTop({
   onBack,
   title,
   lead,
+  backDisabled,
 }: {
   backLabel: string;
   backA11yLabel: string;
   onBack: () => void;
   title: string;
   lead?: string;
+  /** 저장 중처럼 떠나면 안 될 때 */
+  backDisabled?: boolean;
 }) {
   return (
     <View style={{ gap: 4 }}>
-      <LinkButton label={`← ${backLabel}`} accessibilityLabel={backA11yLabel} onPress={onBack} />
+      <LinkButton label={`← ${backLabel}`} accessibilityLabel={backA11yLabel} onPress={onBack} disabled={backDisabled} />
       <AppText variant="title" accessibilityRole="header">
         {title}
       </AppText>

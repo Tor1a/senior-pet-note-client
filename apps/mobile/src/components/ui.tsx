@@ -139,6 +139,8 @@ interface ChoiceButtonProps {
   grow?: boolean;
   /** 높이 56(라디오 행·요일 칸처럼 눌러야 할 일이 많은 칸) */
   tall?: boolean;
+  /** 높이 72(반려동물 종류처럼 둘 중 하나를 크게 고르는 칸) */
+  large?: boolean;
 }
 
 /** 3단 버튼·증상 태그·토글. 선택=채움+✓, 제안=점선+"최근 평균", 최소 48 */
@@ -153,6 +155,7 @@ export function ChoiceButton({
   prefix = '',
   grow,
   tall,
+  large,
 }: ChoiceButtonProps) {
   return (
     <Pressable
@@ -165,6 +168,7 @@ export function ChoiceButton({
         styles.choice,
         grow && styles.choiceGrow,
         tall && styles.choiceTall,
+        large && styles.choiceLarge,
         suggested && styles.choiceSuggested,
         selected && styles.choiceSelected,
         (pressed || disabled) && styles.buttonDimmed,
@@ -366,6 +370,7 @@ const styles = StyleSheet.create({
   },
   choiceGrow: { flexGrow: 1, flexBasis: 0 },
   choiceTall: { minHeight: touch.primaryHeight },
+  choiceLarge: { minHeight: 72 },
   choiceSuggested: { borderStyle: 'dashed', backgroundColor: colors.background },
   choiceSelected: { backgroundColor: colors.primary, borderColor: colors.primary, borderStyle: 'solid' },
   choiceLabel: { fontWeight: '700', textAlign: 'center' },
