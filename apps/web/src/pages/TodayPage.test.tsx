@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DailyLog, Pet, TodayResponse } from '../lib/petApi';
+import { HIGHLIGHT_MS } from '../lib/todayDoses';
 import { setToken } from '../lib/tokenStorage';
 import { PetContext } from '../pet';
 import TodayPage from './TodayPage';
@@ -528,6 +529,193 @@ describe('오늘 화면 — 푸시로 열었을 때(S9)', () => {
     renderToday(undefined, '/today?med=uuid');
     await screen.findByText('10월 6일 (화)');
     expect(screen.queryByText('방금 알림 온 약')).toBeNull();
+  });
+});
+
+describe('오늘 화면 — 알림에서 바로 체크의 대체 흐름(큰 버튼·맨 위)', () => {
+  const second = (taken = false) => ({
+    medicationId: 'm2',
+    name: '레나메진',
+    doseText: '1포',
+    scheduledTime: '21:00',
+    taken,
+    medLogId: taken ? 'log-2' : null,
+    takenAt: taken ? '2026-10-06T00:05:00Z' : null,
+  });
+  const bigButton = () => screen.queryByRole('button', { name: /먹였어요 체크$/ });
+  const order = () => screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
+
+  it('해당 약 카드가 맨 위로 올라오고 카드 아래에 약 이름·시각이 라벨에 든 큰 [먹였어요]가 보인다', async () => {
+    mockServer({
+      'GET /api/pets/pet-1/today': () => json(200, todayExample({ doses: [...todayExample().doses, second()] })),
+    });
+    renderToday(undefined, '/today?source=push&med=m2&t=21:00&d=2026-10-06&n=1');
+    const big = await screen.findByRole('button', { name: '레나메진 1포 오후 9:00 먹였어요 체크' }, { timeout: 4000 });
+    expect(big.textContent).toBe('먹였어요');
+    expect(order()[0]).toContain('레나메진');
+    expect(order()[0]).toContain('방금 알림 온 약');
+    // 큰 버튼은 강조된 카드 하나에만 있다
+    expect(screen.getAllByRole('button', { name: /먹였어요 체크$/ })).toHaveLength(1);
+  });
+
+  it('큰 버튼을 누르면 체크되고(POST /api/med-logs) 카드는 맨 위에서 접힌 줄이 된다', async () => {
+    const calls = mockServer({
+      'GET /api/pets/pet-1/today': () => json(200, todayExample({ doses: [...todayExample().doses, second()] })),
+      'POST /api/med-logs': () =>
+        json(201, { id: 'log-9', medicationId: 'm2', recordDate: '2026-10-06', scheduledTime: '21:00', takenAt: '2026-10-06T12:05:00Z' }),
+    });
+    renderToday(undefined, '/today?source=push&med=m2&t=21:00&d=2026-10-06');
+    await userEvent.click(await screen.findByRole('button', { name: /레나메진.*먹였어요 체크$/ }, { timeout: 4000 }));
+    await waitFor(() => expect(calls.some((c) => c.method === 'POST' && c.path === '/api/med-logs')).toBe(true));
+    expect(calls.find((c) => c.path === '/api/med-logs')?.body).toEqual({ medicationId: 'm2', scheduledTime: '21:00' });
+    expect(await screen.findByRole('button', { name: /레나메진.*체크 되돌리기/ }, { timeout: 4000 })).toBeTruthy();
+    expect(bigButton()).toBeNull();
+    expect(order()[0]).toContain('레나메진'); // 체크해도 아래로 튀지 않는다
+  });
+
+  it('push 로 열지 않았거나 이미 모두 먹인 약이면 큰 버튼이 없다(먹인 약은 접힌 상태 줄이 맨 위)', async () => {
+    mockServer({
+      'GET /api/pets/pet-1/today': () => json(200, todayExample({ doses: [...todayExample().doses, second(true)] })),
+    });
+    renderToday(undefined, '/today?med=m2');
+    await screen.findByText('10월 6일 (화)');
+    expect(bigButton()).toBeNull();
+    expect(order()[0]).toContain('아조딜'); // 순서 그대로
+    cleanup();
+    renderToday(undefined, '/today?source=push&med=m2&t=21:00&d=2026-10-06');
+    await screen.findByText('10월 6일 (화)');
+    expect(bigButton()).toBeNull();
+    expect(order()[0]).toContain('레나메진');
+    expect(order()[0]).toContain('먹임');
+  });
+
+  it('없는 약 id 면 순서도 그대로고 큰 버튼도 없다', async () => {
+    mockServer({ 'GET /api/pets/pet-1/today': () => json(200, todayExample()) });
+    renderToday(undefined, '/today?source=push&med=none');
+    await screen.findByText('10월 6일 (화)');
+    expect(bigButton()).toBeNull();
+    expect(order()[0]).toContain('오전 8:00');
+  });
+});
+
+describe('오늘 화면 — 알림이 가리킨 회차에만 강조·큰 버튼 (리뷰 필수 1)', () => {
+  // 같은 약 m1 의 아침(08:00)·저녁(20:00) 회차
+  const dose = (scheduledTime: string, taken = false) => ({
+    medicationId: 'm1',
+    name: '아조딜',
+    doseText: '1캡슐',
+    scheduledTime,
+    taken,
+    medLogId: taken ? `log-${scheduledTime}` : null,
+    takenAt: taken ? '2026-10-05T23:05:00Z' : null,
+  });
+  const twoDoses = (morningTaken = false) => ({ 'GET /api/pets/pet-1/today': () => json(200, todayExample({ doses: [dose('08:00', morningTaken), dose('20:00')] })) });
+  const bigButtons = () => screen.queryAllByRole('button', { name: /먹였어요 체크$/ });
+  const order = () => screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
+
+  it('08:00 미체크 + 20:00 알림 → 20:00 카드에만 강조·큰 버튼, 맨 위로 올라온다', async () => {
+    mockServer(twoDoses());
+    renderToday(undefined, '/today?source=push&med=m1&t=20:00&d=2026-10-06&n=1');
+    const big = await screen.findByRole('button', { name: /오후 8:00 먹였어요 체크$/ }, { timeout: 4000 });
+    expect(big).toBeTruthy();
+    expect(bigButtons()).toHaveLength(1);
+    expect(order()[0]).toContain('오후 8:00');
+    expect(order()[0]).toContain('방금 알림 온 약');
+    expect(order()[1]).not.toContain('방금 알림 온 약');
+  });
+
+  it('08:00 알림이면 08:00 카드에만 붙는다(같은 약의 저녁 회차에는 붙지 않는다)', async () => {
+    mockServer(twoDoses());
+    renderToday(undefined, '/today?source=push&med=m1&t=08:00&d=2026-10-06&n=1');
+    await screen.findByRole('button', { name: /오전 8:00 먹였어요 체크$/ }, { timeout: 4000 });
+    expect(bigButtons()).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /오후 8:00 먹였어요 체크$/ })).toBeNull();
+  });
+
+  it('08:00 체크 후 20:00 으로 옮겨 가지 않는다(큰 버튼도 강조도 사라진다)', async () => {
+    mockServer({
+      ...twoDoses(),
+      'POST /api/med-logs': () => json(201, { id: 'log-9', medicationId: 'm1', recordDate: '2026-10-06', scheduledTime: '08:00', takenAt: '2026-10-06T00:05:00Z' }),
+    });
+    renderToday(undefined, '/today?source=push&med=m1&t=08:00&d=2026-10-06&n=1');
+    await userEvent.click(await screen.findByRole('button', { name: /오전 8:00 먹였어요 체크$/ }, { timeout: 4000 }));
+    await screen.findByRole('button', { name: /오전 8:00.*체크 되돌리기/ }, { timeout: 4000 });
+    expect(bigButtons()).toHaveLength(0);
+    expect(screen.queryByText('방금 알림 온 약')).toBeNull();
+    expect(order()[0]).toContain('오전 8:00'); // 고정된 자리도 그대로
+  });
+
+  it('어제 알림(d 가 오늘 recordDate 와 다름) → 강조도 큰 버튼도 순서 변경도 없다', async () => {
+    mockServer(twoDoses());
+    renderToday(undefined, '/today?source=push&med=m1&t=20:00&d=2026-10-05&n=1');
+    await screen.findByText('10월 6일 (화)');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('방금 알림 온 약')).toBeNull();
+    expect(bigButtons()).toHaveLength(0);
+    expect(order()[0]).toContain('오전 8:00');
+  });
+
+  it('시각이 없는 옛 URL 은 아직 안 먹인 첫 회차를 강조만 하고 큰 버튼은 붙이지 않는다(보수적 폴백)', async () => {
+    mockServer(twoDoses());
+    renderToday(undefined, '/today?source=push&med=m1&n=1');
+    expect(await screen.findByText('방금 알림 온 약')).toBeTruthy();
+    expect(bigButtons()).toHaveLength(0);
+    expect(order()[0]).toContain('오전 8:00');
+  });
+
+  it('t 에 맞는 회차가 없으면(시각이 바뀜) 같은 약의 다른 회차로 넘어가지 않는다', async () => {
+    mockServer(twoDoses());
+    renderToday(undefined, '/today?source=push&med=m1&t=12:00&d=2026-10-06&n=1');
+    await screen.findByText('10월 6일 (화)');
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.queryByText('방금 알림 온 약')).toBeNull();
+    expect(bigButtons()).toHaveLength(0);
+  });
+});
+
+describe('오늘 화면 — 큰 버튼 UX (리뷰 참고 7)', () => {
+  const dose = (scheduledTime: string) => ({
+    medicationId: 'm1', name: '아조딜', doseText: '1캡슐', scheduledTime, taken: false, medLogId: null, takenAt: null,
+  });
+  const server = () =>
+    mockServer({
+      'GET /api/pets/pet-1/today': () => json(200, todayExample({ doses: [dose('08:00'), dose('20:00')] })),
+      'POST /api/med-logs': () => json(201, { id: 'log-9', medicationId: 'm1', recordDate: '2026-10-06', scheduledTime: '20:00', takenAt: '2026-10-06T11:05:00Z' }),
+    });
+
+  it('2분 강조가 끝나도 큰 버튼은 남는다(카드 높이가 손가락 밑에서 바뀌지 않게). 테두리와 머리글만 사라진다', async () => {
+    let expire: (() => void) | null = null;
+    const realSetTimeout = window.setTimeout.bind(window);
+    const spy = vi.spyOn(window, 'setTimeout').mockImplementation(((fn: TimerHandler, ms?: number, ...args: unknown[]) => {
+      if (ms === HIGHLIGHT_MS) {
+        expire = fn as () => void;
+        return 0;
+      }
+      return realSetTimeout(fn, ms, ...args);
+    }) as typeof window.setTimeout);
+    server();
+    renderToday(undefined, '/today?source=push&med=m1&t=20:00&d=2026-10-06&n=1');
+    await screen.findByRole('button', { name: /오후 8:00 먹였어요 체크$/ }, { timeout: 4000 });
+    expect(screen.getByText('방금 알림 온 약')).toBeTruthy();
+    expect(expire).not.toBeNull();
+    act(() => expire?.());
+    expect(screen.queryByText('방금 알림 온 약')).toBeNull();
+    expect(screen.getByRole('button', { name: /오후 8:00 먹였어요 체크$/ })).toBeTruthy();
+    spy.mockRestore();
+  });
+
+  it('큰 버튼을 누른 직후에도 포커스가 body 로 떨어지지 않고, 줄이 접히면 [되돌리기]로 간다', async () => {
+    server();
+    renderToday(undefined, '/today?source=push&med=m1&t=20:00&d=2026-10-06&n=1');
+    const user = userEvent.setup();
+    const big = await screen.findByRole('button', { name: /오후 8:00 먹였어요 체크$/ }, { timeout: 4000 });
+    await user.click(big);
+    // 체크 직후(접히기 전): 큰 버튼이 그대로 있고 포커스를 유지한다(눌러도 다시 요청하지 않도록 비활성 표시)
+    expect(document.activeElement).not.toBe(document.body);
+    expect(document.contains(big)).toBe(true);
+    expect(big.getAttribute('aria-disabled')).toBe('true');
+    const undo = await screen.findByRole('button', { name: /오후 8:00.*체크 되돌리기/ }, { timeout: 4000 });
+    await waitFor(() => expect(document.activeElement).toBe(undo));
   });
 });
 

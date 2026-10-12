@@ -77,11 +77,94 @@ export function settleDose(list: DoseView[], key: string): DoseView[] {
   return patchDose(list, key, { pending: false });
 }
 
-/** 알림으로 열었을 때 강조할 회차 key. 해당 약의 아직 안 먹인 첫 회차, 없거나 시간이 지났으면 null */
-export function pickHighlightKey(doses: DoseView[], medParam: string | null, expired: boolean): string | null {
-  if (!medParam || expired) return null;
-  const d = doses.find((x) => x.medicationId === medParam && !x.taken);
-  return d ? doseKey(d) : null;
+/**
+ * 알림이 가리킨 회차 (알림-바로-체크 리뷰 필수 1).
+ * URL 의 med(약)·t(시각)·d(기록 날짜)에서 만든다. t·d 는 옛 알림(URL 에 없음)이면 null.
+ */
+export interface PushTarget {
+  medicationId: string;
+  scheduledTime: string | null;
+  recordDate: string | null;
+}
+
+/** URL 값 → 알림이 가리킨 회차. med 가 없으면 null */
+export function pushTargetFromParams(
+  med: string | null | undefined,
+  t: string | null | undefined,
+  d: string | null | undefined,
+): PushTarget | null {
+  if (!med) return null;
+  return { medicationId: med, scheduledTime: t || null, recordDate: d || null };
+}
+
+/**
+ * 처음 정한 강조 회차. 한 번 정하면 화면이 이 값을 들고 있는다(렌더마다 다시 고르지 않는다).
+ * - exact: 약·시각이 모두 맞는 회차 → 큰 [먹였어요]를 붙여도 된다. 시각이 없는 옛 URL(false)은 강조만 한다(보수적 폴백).
+ * - armed: 고른 시점에 아직 안 먹인 회차 → 강조·큰 버튼 대상. 이미 먹인 회차(false)는 맨 위로만 올린다.
+ */
+export interface PushHold {
+  key: string;
+  exact: boolean;
+  armed: boolean;
+}
+
+/**
+ * 알림으로 열었을 때 맨 위로 올리고 강조할 회차를 처음 한 번 고른다.
+ * - d(알림의 기록 날짜)가 오늘 응답의 recordDate 와 다르면 null(어제 알림은 강조·큰 버튼 없음). 값 비교만 한다.
+ * - t 가 있으면 약·시각이 모두 맞는 회차만 고른다(없으면 null). 같은 약의 다음 회차로 넘어가지 않는다.
+ * - t 가 없으면(옛 URL) 그 약의 아직 안 먹인 첫 회차를 강조만 한다. 모두 먹였다면 첫 회차를 맨 위로만 올린다.
+ */
+export function decidePushHold(
+  doses: DoseView[],
+  target: PushTarget | null,
+  recordDate: string | null,
+): PushHold | null {
+  if (!target) return null;
+  if (target.recordDate && target.recordDate !== recordDate) return null;
+  if (target.scheduledTime) {
+    const d = doses.find((x) => x.medicationId === target.medicationId && x.scheduledTime === target.scheduledTime);
+    return d ? { key: doseKey(d), exact: true, armed: !d.taken } : null;
+  }
+  const mine = doses.filter((x) => x.medicationId === target.medicationId);
+  const todo = mine.find((x) => !x.taken);
+  if (todo) return { key: doseKey(todo), exact: false, armed: true };
+  return mine[0] ? { key: doseKey(mine[0]), exact: false, armed: false } : null;
+}
+
+/** 알림으로 열었을 때 강조할 회차 key(처음 고르는 규칙). 이미 먹였거나 시간이 지났거나 회차가 맞지 않으면 null */
+export function pickHighlightKey(
+  doses: DoseView[],
+  target: PushTarget | null,
+  expired: boolean,
+  recordDate: string | null,
+): string | null {
+  if (expired) return null;
+  const hold = decidePushHold(doses, target, recordDate);
+  return hold?.armed ? hold.key : null;
+}
+
+/** 알림으로 열었을 때 맨 위로 올릴 회차 key (알림-바로-체크 설계 6-2). 맞는 회차가 없으면 null */
+export function pickPinnedKey(doses: DoseView[], target: PushTarget | null, recordDate: string | null): string | null {
+  return decidePushHold(doses, target, recordDate)?.key ?? null;
+}
+
+/**
+ * 고정해 둔 회차에서 화면 값을 만든다.
+ * - highlightKey: 테두리·"방금 알림 온 약" (2분 뒤 expired 로 꺼진다)
+ * - bigKey: 큰 [먹였어요] 를 붙일 회차. 시간이 지나도 유지한다(버튼이 사라져 카드 높이가 바뀌며 손가락 밑에서 튀지 않게).
+ *   시각까지 맞는 회차(exact)에만 붙는다. 그 회차를 체크하면 카드가 접히며 사라지고 다음 회차로 옮겨 가지 않는다.
+ */
+export function holdKeys(hold: PushHold | null, expired: boolean): { highlightKey: string | null; bigKey: string | null } {
+  if (!hold || !hold.armed) return { highlightKey: null, bigKey: null };
+  return { highlightKey: expired ? null : hold.key, bigKey: hold.exact ? hold.key : null };
+}
+
+/** 화면에 그릴 순서: pinnedKey 회차를 맨 위로, 나머지는 서버 순서(시각순) 그대로 */
+export function orderWithPinned(doses: DoseView[], pinnedKey: string | null): DoseView[] {
+  if (!pinnedKey) return doses;
+  const pinned = doses.find((d) => doseKey(d) === pinnedKey);
+  if (!pinned) return doses;
+  return [pinned, ...doses.filter((d) => d !== pinned)];
 }
 
 /** 카드에 보여 줄 문구 조각 */

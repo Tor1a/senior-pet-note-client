@@ -5,13 +5,18 @@ import {
   applyUncheckResult,
   collapseTaken,
   daysAgoText,
+  decidePushHold,
   doseKey,
   doseLabel,
   headerInfo,
+  holdKeys,
   mergeServerDoses,
   markTaken,
   markUntaken,
+  orderWithPinned,
   pickHighlightKey,
+  pickPinnedKey,
+  pushTargetFromParams,
   restoreDose,
   rollback,
   settleDose,
@@ -94,18 +99,80 @@ describe('투약 카드 상태', () => {
 });
 
 describe('알림 강조', () => {
+  const DAY = '2026-10-05';
   const list = toDoseViews([DONE, TODO, { ...TODO, medicationId: 'm2' }]);
+  const target = (med: string, t: string | null = null, d: string | null = null) => pushTargetFromParams(med, t, d);
 
-  it('해당 약의 아직 안 먹인 첫 회차를 고른다', () => {
-    expect(pickHighlightKey(list, 'm1', false)).toBe(doseKey(TODO));
-    expect(pickHighlightKey(list, 'm2', false)).toBe('m2@20:00');
+  it('시각이 없는 옛 URL 은 해당 약의 아직 안 먹인 첫 회차를 고른다(강조만, exact 아님)', () => {
+    expect(pickHighlightKey(list, target('m1'), false, DAY)).toBe(doseKey(TODO));
+    expect(pickHighlightKey(list, target('m2'), false, DAY)).toBe('m2@20:00');
+    expect(decidePushHold(list, target('m1'), DAY)).toEqual({ key: doseKey(TODO), exact: false, armed: true });
   });
 
   it('없는 id·source 가 push 가 아님(null)·이미 체크·시간 경과면 null', () => {
-    expect(pickHighlightKey(list, 'nope', false)).toBeNull();
-    expect(pickHighlightKey(list, null, false)).toBeNull();
-    expect(pickHighlightKey(toDoseViews([DONE]), 'm1', false)).toBeNull();
-    expect(pickHighlightKey(list, 'm1', true)).toBeNull();
+    expect(pickHighlightKey(list, target('nope'), false, DAY)).toBeNull();
+    expect(pickHighlightKey(list, null, false, DAY)).toBeNull();
+    expect(pickHighlightKey(toDoseViews([DONE]), target('m1'), false, DAY)).toBeNull();
+    expect(pickHighlightKey(list, target('m1'), true, DAY)).toBeNull();
+  });
+
+  it('t 가 있으면 약·시각이 모두 맞는 회차만 고른다: 08:00 미체크 + 20:00 알림 → 20:00', () => {
+    const two = toDoseViews([{ ...DONE, taken: false, medLogId: null, takenAt: null }, TODO]);
+    expect(pickHighlightKey(two, target('m1', '20:00', DAY), false, DAY)).toBe('m1@20:00');
+    expect(pickHighlightKey(two, target('m1', '08:00', DAY), false, DAY)).toBe('m1@08:00');
+    expect(decidePushHold(two, target('m1', '20:00', DAY), DAY)).toEqual({ key: 'm1@20:00', exact: true, armed: true });
+  });
+
+  it('t 에 맞는 회차가 없으면(시각이 바뀜) 같은 약의 다른 회차로 넘어가지 않고 null', () => {
+    expect(pickHighlightKey(list, target('m1', '12:00', DAY), false, DAY)).toBeNull();
+    expect(pickPinnedKey(list, target('m1', '12:00', DAY), DAY)).toBeNull();
+  });
+
+  it('맞는 회차가 이미 체크돼 있으면 강조·큰 버튼 없이 맨 위로만 올린다(armed false)', () => {
+    expect(pickHighlightKey(list, target('m1', '08:00', DAY), false, DAY)).toBeNull();
+    expect(decidePushHold(list, target('m1', '08:00', DAY), DAY)).toEqual({ key: 'm1@08:00', exact: true, armed: false });
+  });
+
+  it('d 가 오늘 응답의 recordDate 와 다르면(어제 알림) 강조·맨 위 이동 모두 없다', () => {
+    expect(pickHighlightKey(list, target('m1', '20:00', '2026-10-04'), false, DAY)).toBeNull();
+    expect(pickPinnedKey(list, target('m1', '20:00', '2026-10-04'), DAY)).toBeNull();
+    expect(pickHighlightKey(list, target('m1', '20:00', '2026-10-04'), false, null)).toBeNull();
+  });
+
+  it('holdKeys: 강조는 2분 뒤 꺼지지만 큰 버튼은 exact 회차에 남고, armed 가 아니거나 옛 URL 이면 큰 버튼이 없다', () => {
+    const exact = { key: 'm1@20:00', exact: true, armed: true };
+    expect(holdKeys(exact, false)).toEqual({ highlightKey: 'm1@20:00', bigKey: 'm1@20:00' });
+    expect(holdKeys(exact, true)).toEqual({ highlightKey: null, bigKey: 'm1@20:00' });
+    expect(holdKeys({ ...exact, exact: false }, false)).toEqual({ highlightKey: 'm1@20:00', bigKey: null });
+    expect(holdKeys({ ...exact, armed: false }, false)).toEqual({ highlightKey: null, bigKey: null });
+    expect(holdKeys(null, false)).toEqual({ highlightKey: null, bigKey: null });
+  });
+});
+
+describe('pickPinnedKey / orderWithPinned (알림으로 열었을 때 맨 위로)', () => {
+  const DAY = '2026-10-05';
+  const list = toDoseViews([DONE, TODO, { ...TODO, medicationId: 'm2', scheduledTime: '21:00' }]);
+
+  it('옛 URL: 해당 약의 아직 안 먹인 첫 회차, 모두 먹었으면 첫 회차. 없는 약·null 이면 null', () => {
+    expect(pickPinnedKey(list, pushTargetFromParams('m1', null, null), DAY)).toBe(doseKey(TODO));
+    expect(pickPinnedKey(toDoseViews([DONE]), pushTargetFromParams('m1', null, null), DAY)).toBe(doseKey(DONE));
+    expect(pickPinnedKey(list, pushTargetFromParams('none', null, null), DAY)).toBeNull();
+    expect(pickPinnedKey(list, null, DAY)).toBeNull();
+  });
+
+  it('t 가 있으면 그 회차를 올린다(먹은 회차여도)', () => {
+    expect(pickPinnedKey(list, pushTargetFromParams('m1', '08:00', DAY), DAY)).toBe(doseKey(DONE));
+  });
+
+  it('고른 회차만 맨 위로, 나머지는 서버 순서 그대로(원본 배열은 바꾸지 않는다)', () => {
+    const ordered = orderWithPinned(list, 'm2@21:00');
+    expect(ordered.map(doseKey)).toEqual(['m2@21:00', doseKey(DONE), doseKey(TODO)]);
+    expect(list.map(doseKey)).toEqual([doseKey(DONE), doseKey(TODO), 'm2@21:00']);
+  });
+
+  it('key 가 null 이거나 목록에 없으면 같은 배열을 돌려준다', () => {
+    expect(orderWithPinned(list, null)).toBe(list);
+    expect(orderWithPinned(list, 'zzz')).toBe(list);
   });
 });
 

@@ -118,6 +118,9 @@ input[type='time'] { min-height: 3rem; font-size: 1.1rem; }
 .dose-action { flex: none; font-weight: 700; border: 2px solid var(--sub); border-radius: 8px; padding: 0.25rem 0.6rem; background: #fff; font-size: 0.95rem; }
 .dose-card.is-taken .dose-action { border-color: var(--done); color: var(--done); }
 .dose-collapsed .dose-action { border-width: 1px; }
+/* 알림으로 열린 카드 아래의 큰 [먹였어요] (알림-바로-체크 설계 6-2): 폭 전체, 높이 56 이상 */
+.dose-big-button { display: block; width: 100%; margin-top: 0.5rem; min-height: 3.5rem; font-size: 1.2rem; }
+.dose-big-button[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
 .all-done { font-weight: 700; color: var(--done); }
 .below-doses.shifting { pointer-events: none; }
 

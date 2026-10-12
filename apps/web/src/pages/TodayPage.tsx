@@ -7,6 +7,7 @@ import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
 import { HISTORY_TEXT } from '../lib/historyText';
+import { bigDoseButtonLabel, PUSH_ACTION_TEXT } from '../lib/pushActionText';
 import { REPORT_TEXT } from '../lib/reportText';
 import { daysBetween, formatKg, formatRecordDate, LEVEL_LABELS, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
@@ -37,21 +38,25 @@ import {
   COLLAPSE_DELAY_MS,
   collapseTaken,
   daysAgoText,
+  decidePushHold,
   doseKey,
   doseLabel,
   doseParts,
   headerInfo as buildHeaderInfo,
   HIGHLIGHT_MS,
+  holdKeys,
   markTaken,
   markUntaken,
   mergeServerDoses,
-  pickHighlightKey,
+  orderWithPinned,
+  pushTargetFromParams,
   restoreDose,
   rollback,
   settleDose,
   SHIFT_GUARD_EXTRA_MS,
   toDoseViews,
   type DoseView,
+  type PushHold,
 } from '../lib/todayDoses';
 import {
   checkWeightDigits,
@@ -252,19 +257,34 @@ export default function TodayPage() {
     void syncDoses();
   });
 
-  // 알림 탭(?source=push&med=<medicationId>): 해당 약의 아직 안 먹인 회차 카드를 2분간 강조한다(없는 id 면 무시)
+  // 알림 탭(?source=push&med=<medicationId>&t=<scheduledTime>&d=<recordDate>): 알림이 가리킨 "그 회차" 카드를 2분간 강조하고 큰 [먹였어요]를 붙인다.
+  // 약·시각이 모두 맞는 회차만 고르고, d 가 오늘 응답의 recordDate 와 다르면(어제 알림) 강조하지 않는다. t 가 없는 옛 URL 은 강조만 한다.
+  // n 은 알림이 열릴 때마다 바뀌는 값(서비스워커가 붙인다): 같은 약을 다시 눌러도 강조와 2분 타이머가 다시 시작된다
   const medParam = params.get('source') === 'push' ? params.get('med') : null;
+  const target = useMemo(
+    () => pushTargetFromParams(medParam, params.get('t'), params.get('d')),
+    [medParam, params],
+  );
+  const openNonce = params.get('n');
   const [highlightExpired, setHighlightExpired] = useState(false);
   useEffect(() => {
     setHighlightExpired(false);
     if (!medParam) return;
     const t = window.setTimeout(() => setHighlightExpired(true), HIGHLIGHT_MS);
     return () => window.clearTimeout(t);
-  }, [medParam]);
-  const highlightKey = useMemo(
-    () => pickHighlightKey(doses, medParam, highlightExpired),
-    [medParam, highlightExpired, doses],
-  );
+  }, [medParam, openNonce]);
+  // 처음 정한 회차를 저장해 고정한다: 렌더마다 "그 약의 아직 안 먹인 첫 회차"를 다시 고르지 않는다(체크해도 같은 약의 다음 회차로 옮겨 가지 않는다).
+  // 처음 그릴 때부터 맞는 순서가 되도록 렌더 중에 고르고 effect 로 저장한다. 알림을 다시 눌러 열면(n 이 바뀌면) 다시 고른다
+  const pinSig = target ? `${target.medicationId}#${target.scheduledTime ?? ''}#${target.recordDate ?? ''}#${openNonce ?? ''}` : '';
+  const [held, setHeld] = useState<{ sig: string; hold: PushHold } | null>(null);
+  const keptHold = held && held.sig === pinSig ? held.hold : null;
+  const hold = target ? (keptHold ?? decidePushHold(doses, target, today?.recordDate ?? null)) : null;
+  useEffect(() => {
+    if (hold && !keptHold) setHeld({ sig: pinSig, hold });
+  }, [hold, keptHold, pinSig]);
+  const { highlightKey, bigKey } = holdKeys(hold, highlightExpired);
+  const pinnedKey = hold?.key ?? null;
+  const orderedDoses = useMemo(() => orderWithPinned(doses, pinnedKey), [doses, pinnedKey]);
 
   // today_opened: 화면을 열 때 한 번. 실패해도 화면에는 영향 없음
   useEffect(() => {
@@ -675,11 +695,12 @@ export default function TodayPage() {
                     </p>
                   )}
                   <ul className="dose-list">
-                    {doses.map((d) => (
+                    {orderedDoses.map((d) => (
                       <li key={doseKey(d)}>
                         <DoseItem
                           dose={d}
-                          highlight={doseKey(d) === highlightKey}
+                          highlight={doseKey(d) === highlightKey && !d.taken}
+                          bigButton={doseKey(d) === bigKey}
                           onToggle={() => void toggleDose(d)}
                           focusWanted={focusTarget?.key === doseKey(d) ? focusTarget.to : null}
                           onFocused={() => setFocusTarget(null)}
@@ -986,12 +1007,15 @@ export default function TodayPage() {
 function DoseItem({
   dose,
   highlight,
+  bigButton,
   onToggle,
   focusWanted,
   onFocused,
 }: {
   dose: DoseView;
   highlight: boolean;
+  /** 알림이 가리킨 회차에 큰 [먹였어요]를 붙일지(체크하면 카드가 접히며 함께 사라진다) */
+  bigButton: boolean;
   onToggle: () => void;
   /** 체크·되돌리기로 줄 모양이 바뀐 뒤 포커스를 어디로 둘지(키보드 사용자가 포커스를 잃지 않게) */
   focusWanted: 'undo' | 'card' | null;
@@ -1042,7 +1066,7 @@ function DoseItem({
 
   return (
     <>
-      {highlight && <p className="dose-flag">방금 알림 온 약</p>}
+      {highlight && <p className="dose-flag">{PUSH_ACTION_TEXT.highlightFlag}</p>}
       <div
         ref={ref}
         role="checkbox"
@@ -1066,8 +1090,22 @@ function DoseItem({
           <span className="dose-time">{time}</span>
           <span className="dose-name">{what}</span>
         </span>
-        <span className="dose-action">{dose.taken ? takenText : '먹였어요'}</span>
+        <span className="dose-action">{dose.taken ? takenText : PUSH_ACTION_TEXT.actionLabel}</span>
       </div>
+      {/* 알림이 가리킨 회차: 카드 아래에 폭 전체의 큰 [먹였어요]를 바로 보여 준다(알림-바로-체크 설계 6-2).
+          체크한 직후(접히기 전 0.3초)에도 그대로 두어 포커스가 body 로 떨어지지 않게 하고, 줄이 접히면 함께 사라진다(→ 포커스는 [되돌리기]로).
+          2분 강조가 끝나도 남겨 둔다: 손가락 밑에서 카드 높이가 바뀌지 않게 */}
+      {bigButton && (
+        <button
+          type="button"
+          className="btn-primary dose-big-button"
+          aria-label={bigDoseButtonLabel(what, time)}
+          aria-disabled={dose.pending || dose.taken || undefined}
+          onClick={dose.taken ? undefined : onToggle}
+        >
+          {PUSH_ACTION_TEXT.actionLabel}
+        </button>
+      )}
     </>
   );
 }

@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { useNavigate } from 'react-router-dom';
 import { ApiError, type User } from './lib/api';
 import { api, UNAUTHORIZED_EVENT } from './lib/client';
-import { clearToken, getToken, setToken } from './lib/tokenStorage';
+import { clearToken, getToken, setToken, swTokenCopySettled, syncSwTokenCopy } from './lib/tokenStorage';
 import { clearLocalAppData } from './lib/localData';
 import { releaseWebDevice } from './push/device';
 
@@ -33,6 +33,15 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/**
+ * 서비스워커 토큰 사본 삭제를 기다리고, 끝내 지우지 못했으면(재시도·덮어쓰기·deleteDatabase 모두 실패) 개발자 콘솔에만 알린다.
+ * 로그아웃·탈퇴는 이 결과와 상관없이 계속 진행한다(보안상 로그아웃을 막으면 오히려 토큰이 남는다). 토큰 값은 남기지 않는다.
+ */
+async function settleSwCopy(): Promise<void> {
+  const ok = await swTokenCopySettled();
+  if (!ok) console.warn('서비스워커 토큰 사본을 지웠는지 확인하지 못했어요.');
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [status, setStatus] = useState<AuthStatus>(() => (getToken() ? 'loading' : 'signedOut'));
@@ -61,6 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('signedOut');
       }
     }
+  }, []);
+
+  // 앱 시작 시 알림 버튼용 서비스워커 토큰 사본을 현재 로그인 상태에 맞춘다(없으면 지우고, 있으면 같은 값으로 저장)
+  useEffect(() => {
+    syncSwTokenCopy();
   }, []);
 
   // 앱 시작 시 세션 확인
@@ -105,6 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // 해제해야 한다(DELETE /api/devices/{id}, 최대 3초, 실패해도 로그아웃은 진행).
         await releaseWebDevice(true);
         clearToken();
+        await settleSwCopy(); // 서비스워커 토큰 사본 삭제를 마친 뒤 화면을 넘긴다(최대 1초)
         setUser(null);
         setStatus('signedOut');
         navigate('/login', { replace: true });
@@ -115,6 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await releaseWebDevice(false);
         clearToken();
         clearLocalAppData();
+        await settleSwCopy();
         setUser(null);
         setFarewell(true);
         setStatus('signedOut');

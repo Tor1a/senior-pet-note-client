@@ -10,7 +10,7 @@ import {
 } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { formatTime } from '../lib/format';
-import { parseMedReminderData, type MedReminderData } from '../lib/reminderApi';
+import { medTargetQuery, parseMedReminderData, type MedReminderData } from '../lib/reminderApi';
 import { RegistrationSupersededError } from '../lib/pushDevice';
 import { registerWebDevice } from './device';
 import { isMobileDevice, readBrowserEnv, webPush } from './webPush';
@@ -94,8 +94,9 @@ export function cannotReceive(state: PushDeviceState): boolean {
 
 export const TODAY_PUSH_PATH = '/today?source=push';
 
-/** 알림 탭·배너 버튼으로 갈 곳. 해당 약 카드를 강조하도록 medicationId 를 싣는다 */
-export const todayPushPath = (medicationId: string) => `${TODAY_PUSH_PATH}&med=${encodeURIComponent(medicationId)}`;
+/** 인앱 배너 버튼으로 갈 곳. 알림이 가리킨 회차(약·시각·기록 날짜)를 싣는다. n 은 열 때마다 바뀌는 값(같은 약을 다시 눌러도 강조가 다시 시작된다) */
+export const todayPushPath = (data: Pick<MedReminderData, 'medicationId' | 'scheduledTime' | 'recordDate'>) =>
+  `${TODAY_PUSH_PATH}${medTargetQuery(data)}&n=${Date.now()}`;
 
 export function PushProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PushDeviceState>('checking');
@@ -229,7 +230,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
           onOpenToday={() => {
             const last = messages[messages.length - 1];
             setMessages([]);
-            navigate(last ? todayPushPath(last.medicationId) : TODAY_PUSH_PATH);
+            navigate(last ? todayPushPath(last) : TODAY_PUSH_PATH);
           }}
         />
       )}

@@ -138,7 +138,8 @@ describe('PushProvider — 포그라운드 배너(S8)', () => {
     expect(onMessage).toHaveBeenCalledTimes(1);
 
     await userEvent.setup().click(screen.getByRole('button', { name: '오늘 화면에서 체크하기' }));
-    expect(screen.getByTestId('probe').textContent).toContain('/today?source=push&med=m1');
+    // 알림이 가리킨 회차(시각·기록 날짜)와 열 때마다 바뀌는 n 을 함께 싣는다
+    expect(screen.getByTestId('probe').textContent).toMatch(/\/today\?source=push&med=m1&t=08%3A00&d=2026-10-06&n=\d+/);
     expect(screen.queryByRole('status')).toBeNull();
   });
 
