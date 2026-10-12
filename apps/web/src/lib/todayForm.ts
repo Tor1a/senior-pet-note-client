@@ -158,3 +158,21 @@ export function isFirstUse(today: TodayResponse): boolean {
     today.lastWeight == null
   );
 }
+
+/**
+ * 저장하지 않은 바뀐 내용이 있나(웹 이탈 확인용). 기준선(baseline)은 화면을 불러올 때(또는 저장 직후)의 initialTodayForm.
+ * - 제안값(점선)을 그대로 둔 것은 바뀐 것이 아니다. 탭·입력으로 확정하거나 바꾼 값만 센다.
+ * - 바꿨다가 원래대로 돌려놓은 것은 바뀐 것이 아니다(값 비교). 메모는 앞뒤 공백을 무시한다.
+ * - 물 입력 방식(waterMode)은 기기 선호라서 비교하지 않는다.
+ */
+export function isFormDirty(form: TodayForm, baseline: TodayForm): boolean {
+  const level = (a: LevelField, b: LevelField) => a.value !== b.value || a.source !== b.source;
+  if (level(form.food, baseline.food) || level(form.water, baseline.water)) return true;
+  if (form.waterMl.text !== baseline.waterMl.text || form.waterMl.source !== baseline.waterMl.source) return true;
+  if (form.weight.text !== baseline.weight.text || form.weight.measured !== baseline.weight.measured) return true;
+  const a = form.symptoms;
+  const b = baseline.symptoms;
+  if (a.none !== b.none || a.other.trim() !== b.other.trim()) return true;
+  if ([...a.codes].sort().join() !== [...b.codes].sort().join()) return true;
+  return form.memo.trim() !== baseline.memo.trim();
+}

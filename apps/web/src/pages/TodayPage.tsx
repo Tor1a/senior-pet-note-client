@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams, type LinkProps } from 'react-router-dom';
+import ConfirmCard from '../components/ConfirmCard';
 import PetAvatar from '../components/PetAvatar';
+import UndoNotice from '../components/UndoNotice';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
@@ -20,6 +22,7 @@ import {
   buildDailyLogBody,
   initialTodayForm,
   isFirstUse,
+  isFormDirty,
   sanitizeMlInput,
   sanitizeWeightInput,
   stepWeight,
@@ -50,6 +53,25 @@ import {
   toDoseViews,
   type DoseView,
 } from '../lib/todayDoses';
+import {
+  checkWeightDigits,
+  classifyUndoError,
+  parseWeight,
+  planDailyUndo,
+  UNDO_ACTION_MS,
+  UNDO_RESULT_MS,
+  type DailyUndo,
+  type WeightCheck,
+} from '../lib/undoLogic';
+import {
+  doseUndoButtonLabel,
+  doseUndoFailText,
+  doseUndoneText,
+  UNDO_TEXT,
+  weightCardSpeech,
+  weightEnteredText,
+  weightLastText,
+} from '../lib/undoText';
 import { usePet } from '../pet';
 import { usePushMessages } from '../push/PushProvider';
 
@@ -57,7 +79,6 @@ import { usePushMessages } from '../push/PushProvider';
 // - 기록 날짜·제안값·새벽 4시 안내 문구는 서버(GET /today)가 준 값을 그대로 쓴다.
 // - 투약 체크는 탭 즉시 저장(낙관적 업데이트), 일일 기록은 [저장]을 눌러야 확정한다.
 
-const TOAST_MS = 3000;
 const WATER_MODE_KEY = 'spn.waterMode';
 
 function readPreferMl(): boolean {
@@ -76,6 +97,50 @@ function writePreferMl(ml: boolean) {
   }
 }
 
+/** 일일 기록 저장 직후 안내(저장 되돌리기). 되돌리기 정보는 메모리에만 둔다 */
+type DailyNotice =
+  | { kind: 'offer' | 'busy' | 'error'; message: string; undo: DailyUndo }
+  | { kind: 'result'; message: string; tone: 'ok' | 'info' };
+
+/** 투약 되돌린 직후 안내. recheckKey 가 있으면 [다시 체크] 버튼을 보여 준다 */
+interface DoseNotice {
+  message: string;
+  recheckKey: string | null;
+}
+
+/** 글자·화면 확대로 하단 저장 막대가 화면을 많이 차지하는 낮은 화면인가(안내를 스크롤 영역 맨 위로 옮긴다) */
+function useCompactHeight(): boolean {
+  const query = '(max-height: 520px)';
+  const get = () => (typeof window.matchMedia === 'function' ? window.matchMedia(query).matches : false);
+  const [compact, setCompact] = useState(get);
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return;
+    const mq = window.matchMedia(query);
+    const on = () => setCompact(mq.matches);
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
+  return compact;
+}
+
+/** 저장하지 않은 입력이 있으면 앱 안 링크 이동 전에 확인을 거치는 Link (새 탭 열기 같은 보조 클릭은 그대로) */
+function GuardLink({
+  guard,
+  onClick,
+  ...props
+}: LinkProps & { guard: (to: string, from: HTMLElement) => boolean }) {
+  return (
+    <Link
+      {...props}
+      onClick={(e) => {
+        onClick?.(e);
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        if (guard(String(props.to), e.currentTarget)) e.preventDefault();
+      }}
+    />
+  );
+}
+
 export default function TodayPage() {
   const { pet, reload: reloadPet } = usePet();
   const [params] = useSearchParams();
@@ -88,9 +153,19 @@ export default function TodayPage() {
   const [savedLog, setSavedLog] = useState<DailyLog | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [dailyNotice, setDailyNotice] = useState<DailyNotice | null>(null);
+  const [doseNotice, setDoseNotice] = useState<DoseNotice | null>(null);
+  const [focusTarget, setFocusTarget] = useState<{ key: string; to: 'undo' | 'card' } | null>(null);
+  const [weightAsk, setWeightAsk] = useState<{ check: WeightCheck; ago: string; tick: number } | null>(null);
+  const [confirmedWeight, setConfirmedWeight] = useState<number | null>(null);
+  const [leaveTo, setLeaveTo] = useState<{ to: string; from: HTMLElement | null } | null>(null);
   const [shifting, setShifting] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);
+  const navigate = useNavigate();
+  const compact = useCompactHeight();
+  const weightInputRef = useRef<HTMLInputElement>(null);
+  // 방금 체크한 줄의 두 번째 탭 무시(접히는 동안 더블탭이 되돌리기로 이어지지 않게)
+  const guardUntil = useRef<Record<string, number>>({});
 
   // 10초 지표: 화면을 연 시각부터 저장까지의 탭 수와 시간
   const openedAt = useRef(performance.now());
@@ -99,6 +174,12 @@ export default function TodayPage() {
   const timers = useRef<number[]>([]);
 
   const petId = pet?.id ?? null;
+
+  // 비동기 작업이 끝난 시점의 최신 화면 값(되돌리는 중 입력한 내용을 덮지 않기 위해)
+  const formRef = useRef<TodayForm | null>(null);
+  formRef.current = form;
+  const todayRef = useRef<TodayResponse | null>(null);
+  todayRef.current = today;
 
   const later = useCallback((fn: () => void, ms: number) => {
     const t = window.setTimeout(fn, ms);
@@ -129,6 +210,8 @@ export default function TodayPage() {
     setDoses(toDoseViews(t.doses));
     setSavedLog(t.dailyLog);
     setForm(initialTodayForm(t, readPreferMl()));
+    // 날짜·반려동물이 바뀌면 "그대로 저장" 확인값도 새로 시작한다
+    setConfirmedWeight(null);
   }, []);
 
   const load = useCallback(async () => {
@@ -190,12 +273,46 @@ export default function TodayPage() {
     void petApi.sendEvent('today_opened', { source: params.get('source') === 'push' ? 'push' : 'direct' });
   }, [params]);
 
-  // 저장 토스트는 3초 후 사라진다
+  // 저장하지 않은 입력이 있는 채로 새로고침·탭 닫기를 하면 브라우저 기본 경고만 띄운다(문구는 브라우저가 정한다)
+  const baseline = useMemo(() => (today ? initialTodayForm(today) : null), [today]);
+  const dirty = !!form && !!baseline && isFormDirty(form, baseline);
   useEffect(() => {
-    if (!toast) return;
-    const t = window.setTimeout(() => setToast(null), TOAST_MS);
-    return () => window.clearTimeout(t);
-  }, [toast]);
+    if (!dirty) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  /** 앱 안 링크 이동: 바뀐 내용이 있으면 이동을 막고 확인을 띄운다. 막았으면 true */
+  const guardLeave = (to: string, from: HTMLElement) => {
+    if (!dirty) return false;
+    setLeaveTo({ to, from });
+    return true;
+  };
+
+  /** 입력을 고치는 동작은 이 함수로: 저장 되돌리기 안내(폼이 덮이는 사고 방지)와 낡은 체중 확인 카드를 정리한다 */
+  function changeForm(next: TodayForm) {
+    if (form && (next.weight.text !== form.weight.text || next.weight.measured !== form.weight.measured)) {
+      setWeightAsk(null);
+    }
+    setDailyNotice((n) => (n && n.kind !== 'result' && n.kind !== 'busy' ? null : n));
+    setForm(next);
+  }
+
+  // 큰 확대(낮은 화면)에서는 저장 성공 안내가 맨 위에 생기므로 화면을 맨 위로 올려 보이게 한다
+  const offerShown = dailyNotice?.kind === 'offer' || dailyNotice?.kind === 'error';
+  useEffect(() => {
+    if (!compact || !offerShown) return;
+    try {
+      const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: 0, behavior: reduce ? 'auto' : 'smooth' });
+    } catch {
+      // 스크롤을 못 해도 안내는 화면에 있다
+    }
+  }, [compact, offerShown]);
 
   function countTap(e: MouseEvent) {
     const el = e.target as HTMLElement;
@@ -205,11 +322,16 @@ export default function TodayPage() {
   async function toggleDose(dose: DoseView) {
     if (dose.pending) return;
     const key = doseKey(dose);
+    // 접히는 동안 같은 줄의 두 번째 탭은 무시한다(더블탭이 되돌리기로 이어지지 않게)
+    if (dose.taken && Date.now() < (guardUntil.current[key] ?? 0)) return;
     setDoseMessage(null);
+    setDoseNotice(null);
     invalidateSync();
 
     if (!dose.taken) {
       // 낙관적 업데이트: 바로 체크 표시 → 0.3초 뒤 한 줄로 접기
+      guardUntil.current[key] = Date.now() + COLLAPSE_DELAY_MS + SHIFT_GUARD_EXTRA_MS;
+      setFocusTarget({ key, to: 'undo' });
       setDoses((list) => markTaken(list, key, new Date().toISOString()));
       setShifting(true);
       later(() => {
@@ -224,13 +346,15 @@ export default function TodayPage() {
       } catch (err) {
         invalidateSync();
         if (err instanceof ApiError && err.code === 'ALREADY_CHECKED') {
+          setFocusTarget({ key, to: 'undo' });
           // 다른 기기에서 이미 체크함 → 체크 상태 유지, 서버 값(medLogId)으로 맞춘다
           setDoses((list) => settleDose(list, key));
           setDoseMessage('이미 체크된 약이라 화면을 맞췄어요.');
           void syncDoses();
           return;
         }
-        // 실패 → 되돌리고 안내
+        // 실패 → 되돌리고 안내. 줄이 카드로 돌아오므로 포커스도 카드로(null 로 비우면 body 로 빠진다)
+        setFocusTarget({ key, to: 'card' });
         setDoses((list) => rollback(list, key));
         if (err instanceof ApiError && err.status === 404) {
           // 백엔드 규칙: 목록에서 뺀(비활성) 약을 체크하면 404 → 최신 목록으로 맞춘다
@@ -249,45 +373,79 @@ export default function TodayPage() {
       return;
     }
 
-    // 체크 취소
+    // 체크 되돌리기(서버에서는 med-log 삭제)
     if (!dose.medLogId) {
       void syncDoses();
       return;
     }
     const before = { ...dose };
+    setFocusTarget({ key, to: 'card' });
     setDoses((list) => markUntaken(list, key));
     try {
       await petApi.uncheckMed(dose.medLogId);
       invalidateSync();
       setDoses((list) => applyUncheckResult(list, key));
+      setDoseNotice({ message: `${doseUndoneText(dose.name)} ${UNDO_TEXT.doseRecheckHint}`, recheckKey: key });
     } catch (err) {
       invalidateSync();
       if (err instanceof ApiError && err.status === 404) {
-        // 이미 취소된 기록 → 먼저 대기 상태를 풀고(재동기가 실패해도 잠기지 않게) 서버와 맞춘다
+        // 이미 되돌려진 기록 → 먼저 대기 상태를 풀고(재동기가 실패해도 잠기지 않게) 서버와 맞춘다
         setDoses((list) => applyUncheckResult(list, key));
+        setDoseNotice({ message: UNDO_TEXT.doseAlreadyUndone, recheckKey: null });
         void syncDoses();
         return;
       }
+      // 실패하면 줄이 다시 접히므로 포커스를 [되돌리기] 버튼으로 돌려준다(null 로 비우면 body 로 빠진다)
+      setFocusTarget({ key, to: 'undo' });
       setDoses((list) => restoreDose(list, key, before));
       if (err instanceof ApiError && err.status === 401) return;
-      setDoseMessage(`취소하지 못했어요. ${toUserMessage(err, 'medLog')}`);
+      setDoseMessage(doseUndoFailText(toUserMessage(err, 'medLog')));
     }
   }
 
-  async function save() {
-    if (!form || !today || !petId || saving) return;
+  /** 되돌린 직후 안내의 [다시 체크]: 지금 시각으로 다시 기록한다 */
+  function recheckDose(key: string) {
+    const dose = doses.find((d) => doseKey(d) === key);
+    setDoseNotice(null);
+    if (dose && !dose.taken) void toggleDose(dose);
+  }
+
+  async function save(confirmedKg: number | null = confirmedWeight) {
+    if (!form || !today || !petId || saving || dailyNotice?.kind === 'busy') return;
     const problem = validateTodayForm(form);
     setSaveError(problem);
     if (problem) return;
+    // 체중 자릿수 확인: 지난 기록의 5배 이상·1/5 이하면 저장 전에 숫자 두 개를 나란히 보여 주고 묻는다
+    const check = checkWeightDigits({
+      text: form.weight.text,
+      measured: form.weight.measured,
+      lastKg: today.lastWeight?.weightKg ?? null,
+      savedKg: savedLog?.weightKg ?? null,
+      confirmedKg,
+    });
+    if (check.ask && today.lastWeight) {
+      const ago = daysAgoText(daysBetween(today.lastWeight.recordDate, today.recordDate));
+      setWeightAsk((prev) => ({ check, ago, tick: (prev?.tick ?? 0) + 1 }));
+      return;
+    }
+    setWeightAsk(null);
     setSaving(true);
-    const wasFirst = isFirstUse(today) && !savedLog;
     try {
+      // 저장 직전에 서버의 실제 기록을 받아 "되돌릴 값"으로 삼는다(다른 기기가 그 사이 저장했어도 그 기록을 지우거나 낡은 값으로 덮지 않게).
+      // 받지 못하면 화면이 알던 기록(savedLog)을 쓴다. 이때도 되돌릴 때 updatedAt 비교가 다른 곳의 수정을 막아 준다.
+      const server = await petApi.getToday(petId).catch(() => null);
+      const before = server && server.recordDate === today.recordDate ? server.dailyLog : savedLog;
+      const wasFirst = isFirstUse(today) && !savedLog && !before;
       const log = await petApi.saveDailyLog(petId, today.recordDate, buildDailyLogBody(form));
       const next = { ...today, dailyLog: log };
       setToday(next);
       setSavedLog(log);
       setForm(initialTodayForm(next, form.waterMode === 'ml'));
-      setToast(wasFirst ? '첫 기록을 남겼어요. 내일 이 시간쯤 다시 만나요.' : '오늘 기록을 남겼어요. 수고하셨어요');
+      setDailyNotice({
+        kind: 'offer',
+        message: wasFirst ? UNDO_TEXT.dailyFirstSaved : before ? UNDO_TEXT.dailyEdited : UNDO_TEXT.dailySaved,
+        undo: { before, saved: log },
+      });
       void petApi.sendEvent('daily_log_saved', {
         taps: taps.current,
         durationMs: Math.round(performance.now() - openedAt.current),
@@ -309,10 +467,95 @@ export default function TodayPage() {
     }
   }
 
+  /**
+   * 되돌리는 동안 보호자가 입력을 시작했으면(바뀐 내용이 있으면) 입력 폼은 그대로 두고 today/savedLog 만 새로 맞춘다.
+   * 바뀐 내용이 없을 때만 서버 값으로 폼을 다시 만든다.
+   */
+  function refreshFormUnlessEdited(server: TodayResponse) {
+    const f = formRef.current;
+    const t = todayRef.current;
+    if (f && t && isFormDirty(f, initialTodayForm(t))) return;
+    setForm(initialTodayForm(server, f?.waterMode === 'ml'));
+  }
+
+  /** 저장 되돌리기: 서버의 현재 기록(updatedAt)이 내가 저장한 것과 같을 때만 되돌린다(다른 곳에서 고친 기록을 덮어쓰지 않는다) */
+  async function undoDaily() {
+    const notice = dailyNotice;
+    // 저장 중에는 되돌리지 않는다(저장 결과가 나온 뒤 새 저장 기준으로 다시 안내한다)
+    if (!notice || (notice.kind !== 'offer' && notice.kind !== 'error') || !petId || saving) return;
+    const { undo, message } = notice;
+    setDailyNotice({ kind: 'busy', message, undo });
+    const finish = (text: string, tone: 'ok' | 'info') => setDailyNotice({ kind: 'result', message: text, tone });
+    try {
+      const current = await petApi.getToday(petId);
+      const plan = planDailyUndo(undo, current);
+      if (plan.kind === 'conflict') {
+        // 서버 값으로 화면을 맞춘다(그 사이 고친 입력이 없으므로 안전)
+        setToday(current);
+        setSavedLog(current.dailyLog);
+        refreshFormUnlessEdited(current);
+        finish(UNDO_TEXT.dailyConflict, 'info');
+        return;
+      }
+      if (plan.kind === 'expired') {
+        finish(UNDO_TEXT.dailyExpired, 'info');
+        void load();
+        return;
+      }
+      let restored: DailyLog | null = null;
+      if (plan.kind === 'put') restored = await petApi.saveDailyLog(petId, plan.recordDate, plan.body);
+      else await petApi.deleteDailyLog(petId, plan.recordDate);
+      const next = { ...current, dailyLog: restored };
+      setToday(next);
+      setSavedLog(restored);
+      refreshFormUnlessEdited(next);
+      finish(plan.kind === 'put' ? UNDO_TEXT.dailyRestored : UNDO_TEXT.dailyRemoved, 'ok');
+    } catch (err) {
+      const kind = classifyUndoError(err);
+      if (kind === 'auth') return;
+      if (kind === 'gone') {
+        setDailyNotice(null);
+        isPetGone(err);
+        return;
+      }
+      if (kind === 'expired') {
+        finish(UNDO_TEXT.dailyExpired, 'info');
+        void load();
+        return;
+      }
+      setDailyNotice({
+        kind: 'error',
+        message: kind === 'network' ? UNDO_TEXT.dailyFailNetwork : UNDO_TEXT.dailyFailServer,
+        undo,
+      });
+    }
+  }
+
+  function retypeWeight() {
+    setWeightAsk(null);
+    const input = weightInputRef.current;
+    input?.focus();
+    input?.select();
+  }
+
+  function keepWeight() {
+    const kg = form ? parseWeight(form.weight.text) : null;
+    setConfirmedWeight(kg);
+    setWeightAsk(null);
+    void save(kg);
+  }
+
   function setWaterMode(mode: 'level' | 'ml') {
     if (!form) return;
     writePreferMl(mode === 'ml');
     setForm({ ...form, waterMode: mode });
+  }
+
+  /** [계속 적기]: 대화상자를 닫고 이동을 시작한 링크로 포커스를 돌려준다 */
+  function closeLeave() {
+    const from = leaveTo?.from;
+    setLeaveTo(null);
+    window.setTimeout(() => from?.focus(), 0);
   }
 
   // ---------- 화면 ----------
@@ -322,18 +565,46 @@ export default function TodayPage() {
   const firstUse = today ? isFirstUse(today) : false;
   const saveLabel = saving ? '저장하는 중…' : savedLog ? '기록 수정하기' : firstUse ? '첫 기록 저장' : '오늘 기록 저장';
 
+  const dailyNoticeView = dailyNotice && (
+    <div className={compact ? 'undo-top' : undefined}>
+      {dailyNotice.kind === 'result' ? (
+        <UndoNotice
+          key={dailyNotice.message}
+          message={dailyNotice.message}
+          tone={dailyNotice.tone === 'ok' ? 'ok' : 'error'}
+          autoDismissMs={UNDO_RESULT_MS}
+          onDismiss={() => setDailyNotice((n) => (n?.kind === 'result' ? null : n))}
+        />
+      ) : (
+        <UndoNotice
+          message={dailyNotice.message}
+          tone={dailyNotice.kind === 'error' ? 'error' : 'ok'}
+          actionLabel={dailyNotice.kind === 'error' ? UNDO_TEXT.dailyRetry : UNDO_TEXT.dailyUndoButton}
+          busy={dailyNotice.kind === 'busy'}
+          disabled={saving}
+          disabledNote={UNDO_TEXT.dailyUndoWhileSaving}
+          busyLabel={UNDO_TEXT.dailyUndoBusy}
+          onAction={() => void undoDaily()}
+          closeLabel={UNDO_TEXT.close}
+          onClose={dailyNotice.kind === 'busy' ? undefined : () => setDailyNotice(null)}
+        />
+      )}
+    </div>
+  );
+
   return (
-    <div className="today" onClickCapture={countTap}>
+    <>
+    <div className="today" onClickCapture={countTap} inert={leaveTo ? true : undefined}>
       <header className="today-header">
         <div className="row-between">
           <p className="today-date">{today ? formatRecordDate(today.recordDate) : '오늘'}</p>
           <nav className="top-links" aria-label="바로가기">
-            <Link to="/history" className="btn-link menu-link">
+            <GuardLink guard={guardLeave} to="/history" className="btn-link menu-link">
               지난 기록
-            </Link>
-            <Link to="/pet" className="btn-link menu-link" aria-label="메뉴: 프로필과 약 관리">
+            </GuardLink>
+            <GuardLink guard={guardLeave} to="/pet" className="btn-link menu-link" aria-label="메뉴: 프로필과 약 관리">
               ≡ 메뉴
-            </Link>
+            </GuardLink>
           </nav>
         </div>
         <div className="pet-line">
@@ -360,6 +631,7 @@ export default function TodayPage() {
 
         {today && form && (
           <>
+            {compact && dailyNoticeView}
             {firstUse && (
               <section className="welcome">
                 <p className="welcome-title">{withParticle(name, '와', '과')}의 첫 기록을 시작해 볼까요?</p>
@@ -380,9 +652,9 @@ export default function TodayPage() {
                   )}
                 </h2>
                 {doses.length > 0 && (
-                  <Link to="/medications" className="btn-link">
+                  <GuardLink guard={guardLeave} to="/medications" className="btn-link">
                     약 관리
-                  </Link>
+                  </GuardLink>
                 )}
               </div>
               <p className="notice">{today.cutoffNotice}</p>
@@ -391,9 +663,9 @@ export default function TodayPage() {
                 <div className="card med-empty">
                   <p className="strong">💊 먹이는 약이 있나요?</p>
                   <p className="muted">등록하면 오늘 화면에서 한 번에 체크할 수 있어요.</p>
-                  <Link to="/medications" className="btn-secondary link-button">
+                  <GuardLink guard={guardLeave} to="/medications" className="btn-secondary link-button">
                     약 등록하기
-                  </Link>
+                  </GuardLink>
                 </div>
               ) : (
                 <>
@@ -405,7 +677,13 @@ export default function TodayPage() {
                   <ul className="dose-list">
                     {doses.map((d) => (
                       <li key={doseKey(d)}>
-                        <DoseItem dose={d} highlight={doseKey(d) === highlightKey} onToggle={() => void toggleDose(d)} />
+                        <DoseItem
+                          dose={d}
+                          highlight={doseKey(d) === highlightKey}
+                          onToggle={() => void toggleDose(d)}
+                          focusWanted={focusTarget?.key === doseKey(d) ? focusTarget.to : null}
+                          onFocused={() => setFocusTarget(null)}
+                        />
                       </li>
                     ))}
                   </ul>
@@ -415,6 +693,20 @@ export default function TodayPage() {
                 <p role="alert" className="error">
                   {doseMessage}
                 </p>
+              )}
+              {doseNotice && (
+                <div className="dose-notice">
+                  <UndoNotice
+                    key={doseNotice.message}
+                    message={doseNotice.message}
+                    actionLabel={doseNotice.recheckKey ? UNDO_TEXT.doseRecheckButton : undefined}
+                    onAction={() => doseNotice.recheckKey && recheckDose(doseNotice.recheckKey)}
+                    onClose={doseNotice.recheckKey ? () => setDoseNotice(null) : undefined}
+                    closeLabel={UNDO_TEXT.close}
+                    autoDismissMs={doseNotice.recheckKey ? UNDO_ACTION_MS : UNDO_RESULT_MS}
+                    onDismiss={() => setDoseNotice(null)}
+                  />
+                </div>
               )}
             </section>
 
@@ -426,7 +718,7 @@ export default function TodayPage() {
                   title="식사"
                   field={form.food}
                   suggestion={today.suggestions.foodLevel}
-                  onTap={(v) => setForm({ ...form, food: tapLevel(form.food, v) })}
+                  onTap={(v) => changeForm({ ...form, food: tapLevel(form.food, v) })}
                 />
               </section>
 
@@ -437,7 +729,7 @@ export default function TodayPage() {
                     title="물"
                     field={form.water}
                     suggestion={today.suggestions.waterLevel}
-                    onTap={(v) => setForm({ ...form, water: tapLevel(form.water, v) })}
+                    onTap={(v) => changeForm({ ...form, water: tapLevel(form.water, v) })}
                   />
                 ) : (
                   <>
@@ -456,7 +748,7 @@ export default function TodayPage() {
                         value={form.waterMl.text}
                         placeholder="예: 300"
                         onChange={(e) =>
-                          setForm({
+                          changeForm({
                             ...form,
                             waterMl: {
                               text: sanitizeMlInput(e.target.value),
@@ -492,7 +784,7 @@ export default function TodayPage() {
                         type="button"
                         aria-pressed={on}
                         className={`tag ${on ? 'is-confirmed' : ''}`}
-                        onClick={() => setForm({ ...form, symptoms: toggleSymptom(form.symptoms, code) })}
+                        onClick={() => changeForm({ ...form, symptoms: toggleSymptom(form.symptoms, code) })}
                       >
                         {on && <span aria-hidden="true">✓ </span>}
                         {code === 'other' && !on ? '+ ' : ''}
@@ -507,14 +799,14 @@ export default function TodayPage() {
                     maxLength={SYMPTOM_OTHER_MAX_LENGTH}
                     placeholder={`기타 내용 (${SYMPTOM_OTHER_MAX_LENGTH}자까지)`}
                     value={form.symptoms.other}
-                    onChange={(e) => setForm({ ...form, symptoms: { ...form.symptoms, other: e.target.value } })}
+                    onChange={(e) => changeForm({ ...form, symptoms: { ...form.symptoms, other: e.target.value } })}
                   />
                 )}
                 <button
                   type="button"
                   aria-pressed={form.symptoms.none}
                   className={`tag tag-none ${form.symptoms.none ? 'is-confirmed' : ''}`}
-                  onClick={() => setForm({ ...form, symptoms: toggleSymptomNone(form.symptoms) })}
+                  onClick={() => changeForm({ ...form, symptoms: toggleSymptomNone(form.symptoms) })}
                 >
                   {form.symptoms.none && <span aria-hidden="true">✓ </span>}
                   {SYMPTOM_NONE_LABEL}
@@ -538,13 +830,14 @@ export default function TodayPage() {
                     disabled={!form.weight.text}
                     onClick={() => {
                       const text = stepWeight(form.weight.text, -0.1);
-                      if (text !== form.weight.text) setForm({ ...form, weight: { ...form.weight, text, measured: true } });
+                      if (text !== form.weight.text) changeForm({ ...form, weight: { ...form.weight, text, measured: true } });
                     }}
                   >
                     −
                   </button>
                   <div className="unit-input">
                     <input
+                      ref={weightInputRef}
                       inputMode="decimal"
                       aria-label="체중 (kg)"
                       className={!form.weight.measured && form.weight.suggested ? 'is-suggested' : form.weight.measured ? 'is-measured' : ''}
@@ -552,7 +845,7 @@ export default function TodayPage() {
                       placeholder="-.-"
                       onChange={(e) => {
                         const text = sanitizeWeightInput(e.target.value);
-                        setForm({ ...form, weight: { ...form.weight, text, measured: text !== '' } });
+                        changeForm({ ...form, weight: { ...form.weight, text, measured: text !== '' } });
                       }}
                     />
                     <span>kg</span>
@@ -563,7 +856,7 @@ export default function TodayPage() {
                     disabled={!form.weight.text}
                     onClick={() => {
                       const text = stepWeight(form.weight.text, 0.1);
-                      if (text !== form.weight.text) setForm({ ...form, weight: { ...form.weight, text, measured: true } });
+                      if (text !== form.weight.text) changeForm({ ...form, weight: { ...form.weight, text, measured: true } });
                     }}
                   >
                     +
@@ -579,11 +872,33 @@ export default function TodayPage() {
                   aria-pressed={form.weight.measured}
                   disabled={!form.weight.text}
                   className={`choice measured-btn ${form.weight.measured ? 'is-confirmed' : ''}`}
-                  onClick={() => setForm({ ...form, weight: { ...form.weight, measured: !form.weight.measured } })}
+                  onClick={() => changeForm({ ...form, weight: { ...form.weight, measured: !form.weight.measured } })}
                 >
                   {form.weight.measured ? '✓ 오늘 쟀어요' : '오늘 쟀어요'}
                 </button>
                 {!form.weight.measured && <p className="muted small">[오늘 쟀어요]를 누르거나 숫자를 바꾸면 오늘 체중으로 저장돼요.</p>}
+                {weightAsk && today.lastWeight && (
+                  <ConfirmCard
+                    key={weightAsk.tick}
+                    title={UNDO_TEXT.weightTitle}
+                    speech={weightCardSpeech(weightAsk.check.last, weightAsk.check.entered)}
+                    primaryLabel={UNDO_TEXT.weightRetype}
+                    onPrimary={retypeWeight}
+                    secondaryLabel={UNDO_TEXT.weightKeep}
+                    onSecondary={keepWeight}
+                    disabled={saving}
+                    scrollIntoView
+                  >
+                    <dl className="confirm-facts">
+                      <dt>{UNDO_TEXT.weightLastLabel}</dt>
+                      <dd>{weightLastText(weightAsk.check.last, weightAsk.ago)}</dd>
+                      <dt>{UNDO_TEXT.weightEnteredLabel}</dt>
+                      <dd>{weightEnteredText(weightAsk.check.entered)}</dd>
+                    </dl>
+                    <p className="confirm-text">{UNDO_TEXT.weightBody1}</p>
+                    <p className="confirm-text">{UNDO_TEXT.weightBody2}</p>
+                  </ConfirmCard>
+                )}
               </section>
 
               <section className="section" aria-labelledby="memo-title">
@@ -597,28 +912,28 @@ export default function TodayPage() {
                   placeholder="오늘 있었던 일을 짧게 남겨 두세요"
                   value={form.memo}
                   onFocus={() => setMemoOpen(true)}
-                  onChange={(e) => setForm({ ...form, memo: e.target.value })}
+                  onChange={(e) => changeForm({ ...form, memo: e.target.value })}
                 />
                 <p className="muted small align-end">
                   {form.memo.length} / {MEMO_MAX_LENGTH}
                 </p>
               </section>
 
-              <Link to="/history" className="history-link-row">
+              <GuardLink guard={guardLeave} to="/history" className="history-link-row">
                 <span>{HISTORY_TEXT.entryLink}</span>
-              </Link>
+              </GuardLink>
 
               <section className="card" aria-labelledby="report-entry-title">
                 <h2 id="report-entry-title">{REPORT_TEXT.entryCardTitle}</h2>
                 <p>{REPORT_TEXT.entryCardBody}</p>
-                <Link to="/report" className="btn-secondary link-button">
+                <GuardLink guard={guardLeave} to="/report" className="btn-secondary link-button">
                   {REPORT_TEXT.entryCardButton}
-                </Link>
+                </GuardLink>
               </section>
 
-              <Link to="/account" className="history-link-row">
+              <GuardLink guard={guardLeave} to="/account" className="history-link-row">
                 <span>계정 · 로그아웃</span>
-              </Link>
+              </GuardLink>
 
               <p className="disclaimer">{DISCLAIMER}</p>
             </div>
@@ -627,62 +942,100 @@ export default function TodayPage() {
       </main>
 
       <div className="save-bar">
-        <div aria-live="polite" className="toast-slot">
-          {toast && (
-            <p className="toast">
-              <span aria-hidden="true">✓ </span>
-              {toast}
-            </p>
-          )}
-        </div>
+        {!compact && dailyNoticeView}
+        {weightAsk && (
+          <p className="bar-hint" aria-hidden="true">
+            ⓘ {UNDO_TEXT.weightBarHint}
+          </p>
+        )}
         {saveError && (
           <p role="alert" className="error">
             {saveError}
           </p>
         )}
-        <button type="button" className="btn-primary save-btn" disabled={!form || saving} onClick={() => void save()}>
+        <button type="button" className="btn-primary save-btn" disabled={!form || saving || dailyNotice?.kind === 'busy'} onClick={() => void save()}>
           {saveLabel}
         </button>
       </div>
     </div>
+    {leaveTo && (
+      <div className="dialog-backdrop">
+        <div className="dialog leave-dialog">
+          <ConfirmCard
+            role="alertdialog"
+            title={UNDO_TEXT.leaveTitle}
+            primaryLabel={UNDO_TEXT.leaveStay}
+            onPrimary={closeLeave}
+            secondaryLabel={UNDO_TEXT.leaveGo}
+            onSecondary={() => {
+              const to = leaveTo.to;
+              setLeaveTo(null);
+              navigate(to);
+            }}
+            onEscape={closeLeave}
+          >
+            <p className="confirm-text">{UNDO_TEXT.leaveBody}</p>
+          </ConfirmCard>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
 
-function DoseItem({ dose, highlight, onToggle }: { dose: DoseView; highlight: boolean; onToggle: () => void }) {
+function DoseItem({
+  dose,
+  highlight,
+  onToggle,
+  focusWanted,
+  onFocused,
+}: {
+  dose: DoseView;
+  highlight: boolean;
+  onToggle: () => void;
+  /** 체크·되돌리기로 줄 모양이 바뀐 뒤 포커스를 어디로 둘지(키보드 사용자가 포커스를 잃지 않게) */
+  focusWanted: 'undo' | 'card' | null;
+  onFocused: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
+  const undoRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!highlight || !ref.current) return;
     ref.current.scrollIntoView?.({ block: 'center' });
     ref.current.focus({ preventScroll: true });
   }, [highlight]);
 
+  const collapsed = dose.taken && dose.collapsed;
+  const mode = collapsed ? 'undo' : 'card';
+  useEffect(() => {
+    if (!focusWanted || focusWanted !== mode) return;
+    (mode === 'undo' ? undoRef.current : ref.current)?.focus({ preventScroll: true });
+    onFocused();
+  }, [focusWanted, mode, onFocused]);
+
   const { what, time, takenText } = doseParts(dose);
   const label = doseLabel(dose);
 
-  if (dose.taken && dose.collapsed) {
+  if (collapsed) {
+    // 접힌 줄은 줄 전체가 아니라 [되돌리기] 버튼만 반응한다(스크롤하다 건드려도 체크가 풀리지 않게)
     return (
-      <div
-        role="checkbox"
-        aria-checked="true"
-        aria-label={label}
-        aria-disabled={dose.pending || undefined}
-        tabIndex={0}
-        className="dose dose-collapsed"
-        onClick={onToggle}
-        onKeyDown={(e) => {
-          if (e.key === ' ' || e.key === 'Enter') {
-            e.preventDefault();
-            onToggle();
-          }
-        }}
-      >
+      <div className="dose dose-collapsed">
         <span className="check is-on" aria-hidden="true">
           ✓
         </span>
         <span className="dose-line">
           {time} {what} · {takenText}
         </span>
-        <span className="dose-action">취소</span>
+        <button
+          type="button"
+          ref={undoRef}
+          className="dose-action"
+          aria-label={doseUndoButtonLabel(what, time)}
+          aria-disabled={dose.pending || undefined}
+          onClick={onToggle}
+        >
+          {UNDO_TEXT.doseUndoButton}
+        </button>
       </div>
     );
   }
@@ -692,29 +1045,29 @@ function DoseItem({ dose, highlight, onToggle }: { dose: DoseView; highlight: bo
       {highlight && <p className="dose-flag">방금 알림 온 약</p>}
       <div
         ref={ref}
-      role="checkbox"
-      aria-checked={dose.taken}
-      aria-label={label}
-      aria-disabled={dose.pending || undefined}
-      tabIndex={0}
-      className={`dose dose-card ${dose.taken ? 'is-taken' : ''} ${highlight ? 'is-highlight' : ''}`}
-      onClick={onToggle}
-      onKeyDown={(e) => {
-        if (e.key === ' ' || e.key === 'Enter') {
-          e.preventDefault();
-          onToggle();
-        }
-      }}
-    >
-      <span className={`check ${dose.taken ? 'is-on' : ''}`} aria-hidden="true">
-        {dose.taken ? '✓' : ''}
-      </span>
-      <span className="dose-body">
-        <span className="dose-time">{time}</span>
-        <span className="dose-name">{what}</span>
-      </span>
-      <span className="dose-action">{dose.taken ? takenText : '먹였어요'}</span>
-    </div>
+        role="checkbox"
+        aria-checked={dose.taken}
+        aria-label={label}
+        aria-disabled={dose.pending || undefined}
+        tabIndex={0}
+        className={`dose dose-card ${dose.taken ? 'is-taken' : ''} ${highlight ? 'is-highlight' : ''}`}
+        onClick={onToggle}
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            onToggle();
+          }
+        }}
+      >
+        <span className={`check ${dose.taken ? 'is-on' : ''}`} aria-hidden="true">
+          {dose.taken ? '✓' : ''}
+        </span>
+        <span className="dose-body">
+          <span className="dose-time">{time}</span>
+          <span className="dose-name">{what}</span>
+        </span>
+        <span className="dose-action">{dose.taken ? takenText : '먹였어요'}</span>
+      </div>
     </>
   );
 }

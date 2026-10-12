@@ -97,7 +97,7 @@ export function doseParts(dose: Dose): { what: string; time: string; takenText: 
 export function doseLabel(dose: Dose): string {
   const { what, time, takenText } = doseParts(dose);
   return dose.taken
-    ? `${time} ${what}, ${takenText}. 누르면 체크를 취소해요`
+    ? `${time} ${what}, ${takenText}. 누르면 체크를 되돌려요`
     : `${time} ${what}, 아직 체크하지 않았어요. 누르면 먹였어요로 체크해요`;
 }
 

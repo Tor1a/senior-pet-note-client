@@ -323,3 +323,32 @@ input[type='date'] { min-height: 3rem; font-size: 1.1rem; }
   .report-print-footer { display: block; position: fixed; left: 0; right: 0; bottom: 0; padding-top: 1mm; border-top: 1px solid #000; font-size: 9.5pt; text-align: center; }
   :focus-visible { outline: none; }
 }
+
+/* ---------- 저장 되돌리기·실수 방지 (.company/design/저장-되돌리기.md) ---------- */
+/* 되돌리기 안내: .ok(✓ 글자는 문구 앞에 직접 넣는다) / 실패는 .error(ⓘ 안내) */
+.undo-notice { display: flex; flex-direction: column; gap: 0.5rem; margin: 0; }
+.undo-notice.ok::before { content: none; }
+.undo-notice p { margin: 0; }
+.undo-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.undo-actions button { flex: 1 1 8rem; min-height: 3rem; padding: 0 0.75rem; }
+.undo-actions button[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
+.dose-notice { margin-top: 0.5rem; }
+.undo-top { margin: 0 0 0.75rem; }
+/* 접힌 줄: 줄 전체가 아니라 [되돌리기] 버튼만 반응한다(스크롤하다 건드려도 체크가 풀리지 않게) */
+.dose-collapsed { cursor: default; flex-wrap: wrap; }
+.dose-collapsed .dose-action { min-height: 3rem; min-width: 5rem; cursor: pointer; color: var(--text); }
+.dose-collapsed .dose-action[aria-disabled='true'] { opacity: 0.6; cursor: progress; }
+/* 확인 카드(체중 숫자 확인, 이탈 확인): 버튼은 항상 세로 */
+.confirm-card-box { margin: 0.25rem 0; }
+.confirm-card-box button { width: 100%; min-height: 3.5rem; }
+.confirm-card-box .btn-secondary { min-height: 3rem; }
+.confirm-title { margin: 0; font-size: 1.05rem; }
+.confirm-title:focus { outline: none; }
+.confirm-title:focus-visible { outline: 3px solid var(--text); outline-offset: 2px; }
+.confirm-facts { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 1rem; }
+.confirm-facts dt { color: var(--sub); }
+.confirm-facts dd { margin: 0; font-weight: 700; }
+.confirm-text { margin: 0; }
+.bar-hint { margin: 0; font-size: 0.9rem; font-weight: 600; }
+.leave-dialog .confirm-card-box { border: none; padding: 0; background: transparent; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }

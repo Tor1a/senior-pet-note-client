@@ -120,6 +120,16 @@ const radio = (group: string, name: string) =>
   within(screen.getByRole('radiogroup', { name: group })).getByRole('radio', { name: new RegExp(`^${name}`) });
 
 const doseBox = (time: RegExp) => screen.getByRole('checkbox', { name: time });
+/** 접힌 줄의 [되돌리기] 버튼(접힌 줄은 이 버튼만 반응한다) */
+const undoBtn = (time: RegExp) => screen.getByRole('button', { name: new RegExp(`${time.source}.*체크 되돌리기`) });
+const queryUndoBtn = (time: RegExp) =>
+  screen.queryByRole('button', { name: new RegExp(`${time.source}.*체크 되돌리기`) });
+/** 체크된 회차인가(카드 모양이든 접힌 줄이든) */
+const isChecked = (time: RegExp) =>
+  queryUndoBtn(time) !== null || screen.queryByRole('checkbox', { name: time })?.getAttribute('aria-checked') === 'true';
+/** 응답 대기 중인가 */
+const isPending = (time: RegExp) =>
+  (queryUndoBtn(time) ?? screen.getByRole('checkbox', { name: time })).getAttribute('aria-disabled') === 'true';
 
 beforeEach(() => {
   setToken('test-token');
@@ -303,8 +313,8 @@ describe('오늘 화면 — 투약 체크', () => {
       }),
     );
     // 0.3초 뒤 한 줄로 접히고, 서버가 준 체크 시각(한국 20:02)을 보여 준다
-    await waitFor(() => expect(doseBox(/오후 8:00/).className).toContain('dose-collapsed'), { timeout: 2000 });
-    expect(doseBox(/오후 8:00/).getAttribute('aria-label')).toContain('20:02 먹임');
+    await waitFor(() => expect(queryUndoBtn(/오후 8:00/)).not.toBeNull(), { timeout: 2000 });
+    expect(screen.getByText(/20:02 먹임/)).toBeTruthy();
     expect(screen.getByText(/오늘 약 2개 모두 먹였어요/)).toBeTruthy();
     await waitFor(() =>
       expect(calls.some((c) => c.path === '/api/events' && (c.body as { name: string }).name === 'med_checked')).toBe(
@@ -345,31 +355,37 @@ describe('오늘 화면 — 투약 체크', () => {
     await user.click(await waitFor(() => doseBox(/오후 8:00/)));
 
     expect(await screen.findByText('이미 체크된 약이라 화면을 맞췄어요.')).toBeTruthy();
-    expect(doseBox(/오후 8:00/).getAttribute('aria-checked')).toBe('true');
+    expect(isChecked(/오후 8:00/)).toBe(true);
     await waitFor(() => expect(todayCalls).toBe(2));
 
-    // 동기화 후에는 서버의 medLogId 로 취소할 수 있다
-    await user.click(doseBox(/오후 8:00/));
+    // 동기화 후에는 서버의 medLogId 로 되돌릴 수 있다(접힌 줄의 [되돌리기])
+    // (방금 체크한 줄은 접히는 동안 탭을 무시하므로 잠시 기다린다)
+    const recheckable = await waitFor(() => undoBtn(/오후 8:00/));
+    await new Promise((r) => setTimeout(r, 500));
+    await user.click(recheckable);
     await waitFor(() =>
       expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/med-logs/other-device')).toBe(true),
     );
     expect(doseBox(/오후 8:00/).getAttribute('aria-checked')).toBe('false');
   });
 
-  it('체크한 약을 다시 탭하면 DELETE 로 취소한다', async () => {
+  it('접힌 줄의 [되돌리기]를 누르면 DELETE 로 체크를 되돌리고, 결과와 [다시 체크]를 안내한다', async () => {
     const calls = mockServer({
       'GET /api/pets/pet-1/today': () => json(200, todayExample()),
       'DELETE /api/med-logs/uuid': () => new Response(null, { status: 204 }),
     });
     renderToday();
     const user = userEvent.setup();
-    const morning = await waitFor(() => doseBox(/오전 8:00/));
-    expect(morning.getAttribute('aria-checked')).toBe('true');
-    expect(morning.getAttribute('aria-label')).toContain('8:05 먹임'); // 23:05Z = 한국 08:05
+    const morning = await waitFor(() => undoBtn(/오전 8:00/));
+    expect(screen.getByText(/8:05 먹임/)).toBeTruthy(); // 23:05Z = 한국 08:05
+    expect(screen.queryByRole('checkbox', { name: /오전 8:00/ })).toBeNull(); // 접힌 줄은 체크박스가 아니다
 
     await user.click(morning);
     expect(doseBox(/오전 8:00/).getAttribute('aria-checked')).toBe('false');
     await waitFor(() => expect(calls.some((c) => c.method === 'DELETE' && c.path === '/api/med-logs/uuid')).toBe(true));
+    expect(await screen.findByText(/아조딜 체크를 되돌렸어요\./)).toBeTruthy();
+    expect(screen.getByText(/다시 체크하면 지금 시각으로 기록돼요/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 체크' })).toBeTruthy();
   });
 
   it('체크 취소 중 늦게 도착한 오래된 GET /today 응답이 낙관적 상태를 덮어쓰지 않는다', async () => {
@@ -390,7 +406,7 @@ describe('오늘 화면 — 투약 체크', () => {
     const user = userEvent.setup();
     await user.click(await waitFor(() => doseBox(/오후 8:00/)));
     await waitFor(() => expect(todayCalls).toBe(2));
-    await user.click(doseBox(/오전 8:00/)); // 취소(DELETE 성공)
+    await user.click(await waitFor(() => undoBtn(/오전 8:00/))); // 되돌리기(DELETE 성공)
     await waitFor(() => expect(doseBox(/오전 8:00/).getAttribute('aria-checked')).toBe('false'));
     releaseStale();
     await new Promise((r) => setTimeout(r, 50));
@@ -418,17 +434,17 @@ describe('오늘 화면 — 투약 체크', () => {
     await user.click(evening);
     await user.click(evening);
     await user.click(evening);
-    await user.click(doseBox(/오전 8:00/)); // 취소 404 → GET /today (서버는 저녁을 아직 안 먹인 것으로 앎)
+    await user.click(undoBtn(/오전 8:00/)); // 되돌리기 404 → GET /today (서버는 저녁을 아직 안 먹인 것으로 앎)
     await waitFor(() => expect(todayCalls).toBe(2));
     await new Promise((r) => setTimeout(r, 50));
-    expect(doseBox(/오후 8:00/).getAttribute('aria-checked')).toBe('true');
+    expect(isChecked(/오후 8:00/)).toBe(true);
     releasePost();
-    await waitFor(() => expect(doseBox(/오후 8:00/).getAttribute('aria-disabled')).toBeNull());
-    expect(doseBox(/오후 8:00/).getAttribute('aria-checked')).toBe('true');
+    await waitFor(() => expect(isPending(/오후 8:00/)).toBe(false));
+    expect(isChecked(/오후 8:00/)).toBe(true);
     expect(calls.filter((c) => c.method === 'POST' && c.path === '/api/med-logs')).toHaveLength(1);
   });
 
-  it('취소가 404 이고 재동기도 실패해도 대기 상태가 풀려 다시 누를 수 있다', async () => {
+  it('되돌리기가 404 이고 재동기도 실패해도 대기 상태가 풀려 다시 누를 수 있다', async () => {
     let todayCalls = 0;
     mockServer({
       'GET /api/pets/pet-1/today': () => {
@@ -439,10 +455,11 @@ describe('오늘 화면 — 투약 체크', () => {
     });
     renderToday();
     const user = userEvent.setup();
-    await user.click(await waitFor(() => doseBox(/오전 8:00/)));
+    await user.click(await waitFor(() => undoBtn(/오전 8:00/)));
     await waitFor(() => expect(todayCalls).toBe(2));
     await waitFor(() => expect(doseBox(/오전 8:00/).getAttribute('aria-disabled')).toBeNull());
     expect(doseBox(/오전 8:00/).getAttribute('aria-checked')).toBe('false');
+    expect(await screen.findByText(/이미 되돌려진 기록이라 화면을 맞췄어요/)).toBeTruthy();
   });
 });
 
