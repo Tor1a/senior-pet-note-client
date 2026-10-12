@@ -152,6 +152,9 @@ export function createPetApi(client: ApiClient) {
     uncheckMed: (medLogId: string) => client.request<null>(`/api/med-logs/${enc(medLogId)}`, { method: 'DELETE' }),
     saveDailyLog: (petId: string, recordDate: string, body: DailyLogBody) =>
       client.request<DailyLog>(`/api/pets/${enc(petId)}/daily-logs/${enc(recordDate)}`, { method: 'PUT', body }),
+    /** 오늘 기록 삭제(저장 되돌리기). 기록이 없어도 204. 서버가 말하는 현재 기록 날짜만 지울 수 있다(아니면 400 INVALID_RECORD_DATE) */
+    deleteDailyLog: (petId: string, recordDate: string) =>
+      client.request<null>(`/api/pets/${enc(petId)}/daily-logs/${enc(recordDate)}`, { method: 'DELETE' }),
 
     /** 기간별 일일 기록. 기본은 파라미터 없이(서버가 "오늘"과 30일을 정한다). 하루 상세는 from=to=날짜 */
     getHistory: (petId: string, range: { from?: string; to?: string } = {}) => {

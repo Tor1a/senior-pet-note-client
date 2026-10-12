@@ -185,14 +185,23 @@ export function AppInput({
   style,
   dashed,
   onFocus,
+  inputRef,
   ...inputProps
-}: TextInputProps & { accessibilityLabel: string; dashed?: boolean }) {
+}: TextInputProps & {
+  accessibilityLabel: string;
+  dashed?: boolean;
+  /** 바깥에서 포커스·전체 선택을 하고 싶을 때 입력칸 참조를 받는다 */
+  inputRef?: { current: TextInput | null };
+}) {
   const ref = useRef<TextInput>(null);
   const reveal = useContext(RevealInputContext);
   return (
     <TextInput
       {...inputProps}
-      ref={ref}
+      ref={(node) => {
+        ref.current = node;
+        if (inputRef) inputRef.current = node;
+      }}
       onFocus={(e) => {
         onFocus?.(e);
         if (ref.current) reveal(ref.current as unknown as View);

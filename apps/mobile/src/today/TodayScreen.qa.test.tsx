@@ -67,6 +67,13 @@ const saved = (b: Record<string, unknown> = {}) => ({
 });
 const puts = () => calls.filter((c) => c.method === 'PUT');
 const evening = () => screen.getByRole('checkbox', { name: /오후 8:00/ });
+/** 접힌 줄의 [되돌리기] 버튼(접힌 줄은 이 버튼만 반응한다) */
+const undoBtn = (time: RegExp) => screen.getByRole('button', { name: new RegExp(`${time.source}.*체크 되돌리기`) });
+/** 방금 체크한 줄은 접히는 동안(0.45초) 두 번째 탭을 무시한다 */
+const afterGuard = () => act(async () => void (await new Promise((r) => setTimeout(r, 500))));
+/** 카드 모양이든 접힌 줄이든 그 회차의 눌림 요소 */
+const doseNode = (time: RegExp) =>
+  screen.queryByRole('checkbox', { name: time }) ?? screen.getByRole('button', { name: new RegExp(`${time.source}.*체크 되돌리기`) });
 
 beforeEach(() => {
   calls = [];
@@ -107,20 +114,21 @@ describe('QA 투약 — 연타·롤백', () => {
     await renderToday();
     await fireEvent.press(evening());
     await screen.findByText('오늘 먹일 약 2 / 2');
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오후 8:00/ }));
+    await afterGuard();
+    await fireEvent.press(undoBtn(/오후 8:00/));
     await screen.findByText('오늘 먹일 약 1 / 2');
     expect(calls.find((c) => c.method === 'DELETE')!.url).toBe('/api/med-logs/log-9');
   });
 
-  it('취소가 실패하면 체크 상태로 복원하고 안내한다', async () => {
+  it('되돌리기가 실패하면 체크 상태로 복원하고 안내한다', async () => {
     setup((r) => (r.method === 'DELETE' ? json(500, { code: 'INTERNAL', message: 'x' }) : undefined));
     await renderToday();
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오전 8:00/ }));
-    await screen.findByText(/취소하지 못했어요/);
+    await fireEvent.press(undoBtn(/오전 8:00/));
+    await screen.findByText(/되돌리지 못했어요\..* 한 번 더 눌러 주세요/);
     expect(screen.getByText('오늘 먹일 약 1 / 2')).toBeTruthy();
   });
 
-  it('취소가 404 면 안내 없이 서버 상태로 다시 맞춘다', async () => {
+  it('되돌리기가 404 면 이미 되돌려진 기록이라는 안내와 함께 서버 상태로 다시 맞춘다', async () => {
     const synced = todayExample();
     synced.doses[0] = { ...synced.doses[0], taken: false, medLogId: null, takenAt: null };
     let n = 0;
@@ -129,9 +137,10 @@ describe('QA 투약 — 연타·롤백', () => {
       if (r.url.endsWith('/today')) return json(200, ++n === 1 ? todayExample() : synced);
     });
     await renderToday();
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오전 8:00/ }));
+    await fireEvent.press(undoBtn(/오전 8:00/));
     await screen.findByText('오늘 먹일 약 0 / 2');
-    expect(screen.queryByText(/취소하지 못했어요/)).toBeNull();
+    expect(screen.queryByText(/되돌리지 못했어요/)).toBeNull();
+    expect(screen.getByText(/이미 되돌려진 기록이라 화면을 맞췄어요/)).toBeTruthy();
   });
 
   it('체크가 404 면 되돌리고 목록을 다시 맞춘다', async () => {
@@ -168,12 +177,12 @@ describe('QA 투약 — 연타·롤백', () => {
     expect(screen.queryByText(/체크하지 못했어요/)).toBeNull();
   });
 
-  it('취소가 401 이어도 문구 없이 복원한다', async () => {
+  it('되돌리기가 401 이어도 문구 없이 복원한다', async () => {
     setup((r) => (r.method === 'DELETE' ? json(401, { code: 'UNAUTHORIZED', message: 'x' }) : undefined));
     await renderToday();
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오전 8:00/ }));
+    await fireEvent.press(undoBtn(/오전 8:00/));
     await waitFor(() => expect(screen.getByText('오늘 먹일 약 1 / 2')).toBeTruthy());
-    expect(screen.queryByText(/취소하지 못했어요/)).toBeNull();
+    expect(screen.queryByText(/되돌리지 못했어요/)).toBeNull();
   });
 });
 
@@ -195,7 +204,7 @@ describe('투약 — 오래된 재동기 응답과 대기 상태', () => {
     await renderToday();
     await fireEvent.press(evening());
     await waitFor(() => expect(todayCalls).toBe(2));
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오전 8:00/ })); // 취소 성공
+    await fireEvent.press(undoBtn(/오전 8:00/)); // 되돌리기 성공
     const morning = () => screen.getByRole('checkbox', { name: /오전 8:00/ });
     await waitFor(() => expect(morning().props.accessibilityState).toMatchObject({ checked: false, disabled: false }));
     await act(async () => releaseStale());
@@ -216,12 +225,13 @@ describe('투약 — 오래된 재동기 응답과 대기 상태', () => {
     });
     await renderToday();
     await fireEvent.press(evening());
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오전 8:00/ }));
+    await fireEvent.press(undoBtn(/오전 8:00/));
     await waitFor(() => expect(todayCalls).toBe(2));
     await act(async () => {});
-    expect(screen.getByRole('checkbox', { name: /오후 8:00/ }).props.accessibilityState).toMatchObject({ checked: true, disabled: true });
+    expect(doseNode(/오후 8:00/).props.accessibilityState).toMatchObject({ disabled: true });
     await act(async () => releasePost());
-    await waitFor(() => expect(screen.getByRole('checkbox', { name: /오후 8:00/ }).props.accessibilityState).toMatchObject({ checked: true, disabled: false }));
+    await waitFor(() => expect(doseNode(/오후 8:00/).props.accessibilityState).toMatchObject({ disabled: false }));
+    expect(screen.queryByRole('checkbox', { name: /오후 8:00/ })?.props.accessibilityState.checked ?? true).toBe(true);
     expect(calls.filter((c) => c.method === 'POST' && c.url === '/api/med-logs')).toHaveLength(1);
   });
 
@@ -232,7 +242,7 @@ describe('투약 — 오래된 재동기 응답과 대기 상태', () => {
       if (r.method === 'DELETE') return json(404, { code: 'NOT_FOUND', message: 'x' });
     });
     await renderToday();
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오전 8:00/ }));
+    await fireEvent.press(undoBtn(/오전 8:00/));
     await waitFor(() => expect(todayCalls).toBe(2));
     await waitFor(() => expect(screen.getByRole('checkbox', { name: /오전 8:00/ }).props.accessibilityState).toMatchObject({ checked: false, disabled: false }));
   });
@@ -360,6 +370,7 @@ describe('QA 저장 — 값 변환과 경계', () => {
     await renderToday();
     await fireEvent.changeText(screen.getByLabelText('체중 (kg)'), '199.99');
     await pressSave();
+    await fireEvent.press(await screen.findByRole('button', { name: '그대로 저장' })); // 지난 기록(4.4kg)의 5배 이상이라 한 번 확인
     await screen.findByText(/오늘 기록을 남겼어요/);
     expect(puts()[0].body.weightKg).toBe(199.99);
   });

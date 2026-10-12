@@ -1,8 +1,12 @@
 // 투약 섹션: "오늘 먹일 약 n / m", 카드(대기·접힘·강조), 오류 문구 (웹 TodayPage 투약 영역과 같은 문구)
+// 접힌 줄은 줄 전체가 아니라 [되돌리기] 버튼만 반응한다(스크롤하다 건드려도 체크가 풀리지 않게). 되돌린 직후에는 [다시 체크] 안내를 보여 준다.
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, findNodeHandle, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { UndoNotice } from '../../components/UndoNotice';
 import { AppButton, AppText, Card } from '../../components/ui';
 import { doseKey, doseLabel, doseParts, type DoseView } from '../../lib/todayDoses';
+import { doseUndoButtonLabel, UNDO_TEXT } from '../../lib/undoText';
+import { UNDO_ACTION_MS, UNDO_RESULT_MS } from '../../lib/undoLogic';
 import { colors, spacing, touch } from '../../theme';
 import { isLargeFont } from '../../medications/layout';
 
@@ -20,9 +24,31 @@ interface DoseSectionProps {
   onHistory: () => void;
   /** 약 등록 화면으로(약이 하나도 없을 때) */
   onAdd: () => void;
+  /** 되돌린 직후 안내. recheckKey 가 있으면 [다시 체크] 버튼을 보여 준다 */
+  notice?: { message: string; recheckKey: string | null } | null;
+  onRecheck?: (key: string) => void;
+  onDismissNotice?: () => void;
+  /** 체크·되돌리기로 줄 모양이 바뀐 뒤 접근성 포커스를 둘 곳 */
+  focusTarget?: { key: string; to: 'undo' | 'card' } | null;
+  onFocused?: () => void;
 }
 
-export function DoseSection({ doses, cutoffNotice, message, highlightKey, onToggle, onHighlight, onManage, onHistory, onAdd }: DoseSectionProps) {
+export function DoseSection({
+  doses,
+  cutoffNotice,
+  message,
+  highlightKey,
+  onToggle,
+  onHighlight,
+  onManage,
+  onHistory,
+  onAdd,
+  notice = null,
+  onRecheck,
+  onDismissNotice,
+  focusTarget = null,
+  onFocused,
+}: DoseSectionProps) {
   const { fontScale } = useWindowDimensions();
   const takenCount = doses.filter((d) => d.taken).length;
   return (
@@ -51,6 +77,8 @@ export function DoseSection({ doses, cutoffNotice, message, highlightKey, onTogg
               highlight={doseKey(d) === highlightKey}
               onToggle={() => onToggle(d)}
               onHighlight={onHighlight}
+              focusWanted={focusTarget?.key === doseKey(d) ? focusTarget.to : null}
+              onFocused={onFocused}
             />
           ))}
         </>
@@ -70,6 +98,18 @@ export function DoseSection({ doses, cutoffNotice, message, highlightKey, onTogg
           {`! ${message}`}
         </AppText>
       )}
+      {notice && (
+        <UndoNotice
+          key={notice.message}
+          message={notice.message}
+          actionLabel={notice.recheckKey ? UNDO_TEXT.doseRecheckButton : undefined}
+          onAction={() => notice.recheckKey && onRecheck?.(notice.recheckKey)}
+          onClose={notice.recheckKey ? onDismissNotice : undefined}
+          closeLabel={UNDO_TEXT.close}
+          autoDismissMs={notice.recheckKey ? UNDO_ACTION_MS : UNDO_RESULT_MS}
+          onDismiss={onDismissNotice}
+        />
+      )}
     </View>
   );
 }
@@ -79,13 +119,30 @@ function DoseItem({
   highlight,
   onToggle,
   onHighlight,
+  focusWanted,
+  onFocused,
 }: {
   dose: DoseView;
   highlight: boolean;
   onToggle: () => void;
   onHighlight: (node: View) => void;
+  focusWanted: 'undo' | 'card' | null;
+  onFocused?: () => void;
 }) {
   const ref = useRef<View>(null);
+  const undoRef = useRef<View>(null);
+  const collapsedNow = dose.taken && dose.collapsed;
+  const mode = collapsedNow ? 'undo' : 'card';
+  useEffect(() => {
+    if (!focusWanted || focusWanted !== mode) return;
+    const node = mode === 'undo' ? undoRef.current : ref.current;
+    const tag = node ? findNodeHandle(node) : null;
+    if (tag) AccessibilityInfo.setAccessibilityFocus?.(tag);
+    onFocused?.();
+    // onFocused 는 화면이 바뀔 때마다 새로 만들어져도 다시 부르지 않는다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusWanted, mode]);
+  const fontScale = useWindowDimensions().fontScale;
   useEffect(() => {
     if (highlight && ref.current) onHighlight(ref.current);
     // onHighlight 는 화면이 바뀔 때마다 새로 만들어져도 다시 스크롤하지 않는다
@@ -94,30 +151,44 @@ function DoseItem({
 
   const { what, time, takenText } = doseParts(dose);
   // 큰 글씨(1.3~)에서는 이름과 용량을 줄 단위로 나눠 "1 / 정"처럼 단어 중간에서 끊기지 않게 한다
-  const stacked = isLargeFont(useWindowDimensions().fontScale) && !!dose.doseText;
+  const stacked = isLargeFont(fontScale) && !!dose.doseText;
   const a11y = {
     accessibilityRole: 'checkbox' as const,
     accessibilityLabel: highlight ? `방금 알림 온 약, ${doseLabel(dose)}` : doseLabel(dose),
     accessibilityState: { checked: dose.taken, disabled: dose.pending },
   };
 
-  if (dose.taken && dose.collapsed) {
+  if (collapsedNow) {
+    const large = isLargeFont(fontScale);
     return (
-      <Pressable ref={ref} {...a11y} onPress={onToggle} style={[styles.collapsed]}>
-        <AppText style={[styles.check, { color: colors.done }]}>✓</AppText>
-        {stacked ? (
-          <View style={styles.collapsedLine}>
-            <AppText>{`${time} ${dose.name}`}</AppText>
-            <AppText>{dose.doseText}</AppText>
-            <AppText>{takenText}</AppText>
-          </View>
-        ) : (
-          <AppText style={styles.collapsedLine}>{`${time} ${what} · ${takenText}`}</AppText>
-        )}
-        <AppText variant="secondary" style={styles.bold}>
-          취소
-        </AppText>
-      </Pressable>
+      <View ref={ref} style={[styles.collapsed, large && styles.collapsedLarge]}>
+        <View style={styles.collapsedTop}>
+          <AppText style={[styles.check, { color: colors.done }]} accessibilityElementsHidden importantForAccessibility="no">
+            ✓
+          </AppText>
+          {stacked ? (
+            <View style={styles.collapsedLine}>
+              <AppText>{`${time} ${dose.name}`}</AppText>
+              <AppText>{dose.doseText}</AppText>
+              <AppText>{takenText}</AppText>
+            </View>
+          ) : (
+            <AppText style={styles.collapsedLine}>{`${time} ${what} · ${takenText}`}</AppText>
+          )}
+        </View>
+        <Pressable
+          ref={undoRef}
+          accessibilityRole="button"
+          accessibilityLabel={doseUndoButtonLabel(what, time)}
+          accessibilityState={{ disabled: dose.pending }}
+          disabled={dose.pending}
+          onPress={onToggle}
+          hitSlop={4}
+          style={({ pressed }) => [styles.undoButton, large && styles.undoButtonLarge, (pressed || dose.pending) && { opacity: 0.6 }]}
+        >
+          <AppText style={styles.bold}>{UNDO_TEXT.doseUndoButton}</AppText>
+        </Pressable>
+      </View>
     );
   }
 
@@ -193,11 +264,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
     borderRadius: 12,
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.done,
   },
+  collapsedLarge: { flexDirection: 'column', alignItems: 'stretch' },
+  collapsedTop: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  undoButton: {
+    minHeight: touch.minSize,
+    minWidth: touch.minSize,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 8,
+    borderWidth: 2,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  undoButtonLarge: { minHeight: touch.primaryHeight },
   check: { fontWeight: '700' },
   collapsedLine: { flex: 1 },
 });

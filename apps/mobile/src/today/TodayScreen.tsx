@@ -4,11 +4,12 @@
 // - 모바일에서 더한 것: 앱이 앞으로 돌아왔을 때 재동기(날짜가 바뀌었으면 화면 교체), 당겨서 새로고침(투약만).
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, AppState, findNodeHandle, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, AppState, findNodeHandle, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions, type TextInput } from 'react-native';
+import { UndoNotice } from '../components/UndoNotice';
 import { AppButton, AppText, Card, Screen } from '../components/ui';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { DISCLAIMER } from '../lib/constants';
-import { formatRecordDate, withParticle } from '../lib/format';
+import { daysBetween, formatRecordDate, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
 import { toggleSymptom, toggleSymptomNone } from '../lib/symptoms';
 import {
@@ -16,6 +17,7 @@ import {
   applyUncheckResult,
   COLLAPSE_DELAY_MS,
   collapseTaken,
+  daysAgoText,
   doseKey,
   headerInfo as buildHeaderInfo,
   HIGHLIGHT_MS,
@@ -33,6 +35,7 @@ import {
 import {
   buildDailyLogBody,
   initialTodayForm,
+  isFormDirty,
   isFirstUse,
   sanitizeMlInput,
   sanitizeWeightInput,
@@ -41,7 +44,18 @@ import {
   validateTodayForm,
   type TodayForm,
 } from '../lib/todayForm';
+import {
+  checkWeightDigits,
+  classifyUndoError,
+  parseWeight,
+  planDailyUndo,
+  UNDO_RESULT_MS,
+  type DailyUndo,
+  type WeightCheck,
+} from '../lib/undoLogic';
+import { doseUndoFailText, doseUndoneText, UNDO_TEXT } from '../lib/undoText';
 import { HISTORY_HREF } from '../history/routes';
+import { isLargeFont } from '../medications/layout';
 import { REPORT_TEXT } from '../lib/reportText';
 import { REPORT_HREF } from '../report/routes';
 import { MEDICATIONS_HREF, NEW_MEDICATION_HREF } from '../medications/routes';
@@ -58,9 +72,14 @@ import { SaveBar } from './sections/SaveBar';
 import { SymptomSection } from './sections/SymptomSection';
 import { TodayHeader } from './sections/TodayHeader';
 import { WaterSection } from './sections/WaterSection';
+import { WeightConfirm } from './sections/WeightConfirm';
 import { WeightSection } from './sections/WeightSection';
 
-const TOAST_MS = 3000;
+/** 일일 기록 저장 직후 안내(저장 되돌리기). 되돌리기 정보는 메모리에만 둔다 */
+type DailyNotice =
+  | { kind: 'offer' | 'busy' | 'error'; message: string; undo: DailyUndo }
+  | { kind: 'result'; message: string; tone: 'ok' | 'info' };
+
 /** 앱이 앞으로 돌아올 때 서버 재확인 최소 간격(과호출 방지) */
 export const RESYNC_MIN_INTERVAL_MS = 30_000;
 export const DATE_CHANGED_NOTICE = '새 날짜가 되어 화면을 새로 불러왔어요.';
@@ -82,7 +101,17 @@ export default function TodayScreen() {
   const [savedLog, setSavedLog] = useState<DailyLog | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
+  const [dailyNotice, setDailyNotice] = useState<DailyNotice | null>(null);
+  const [doseNotice, setDoseNotice] = useState<{ message: string; recheckKey: string | null } | null>(null);
+  const [focusTarget, setFocusTarget] = useState<{ key: string; to: 'undo' | 'card' } | null>(null);
+  const [weightAsk, setWeightAsk] = useState<{ check: WeightCheck; ago: string; tick: number } | null>(null);
+  const [confirmedWeight, setConfirmedWeight] = useState<number | null>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const { fontScale } = useWindowDimensions();
+  const largeFont = isLargeFont(fontScale);
+  const weightInputRef = useRef<TextInput | null>(null);
+  // 방금 체크한 줄의 두 번째 탭 무시(접히는 동안 더블탭이 되돌리기로 이어지지 않게)
+  const guardUntil = useRef<Record<string, number>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [shifting, setShifting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -95,6 +124,9 @@ export default function TodayScreen() {
   const lastFetchAt = useRef(Date.now());
   const todayRef = useRef<TodayResponse | null>(null);
   todayRef.current = today;
+  // 비동기 작업이 끝난 시점의 최신 입력(되돌리는 중 입력한 내용을 덮지 않기 위해)
+  const formRef = useRef<TodayForm | null>(null);
+  formRef.current = form;
   const scrollRef = useRef<ScrollView>(null);
 
   const petId = pet?.id ?? null;
@@ -127,6 +159,8 @@ export default function TodayScreen() {
     setDoses(toDoseViews(t.doses));
     setSavedLog(t.dailyLog);
     setForm(initialTodayForm(t, preferMl));
+    // 날짜·반려동물이 바뀌면 "그대로 저장" 확인값도 새로 시작한다
+    setConfirmedWeight(null);
   }, []);
 
   const load = useCallback(async () => {
@@ -202,7 +236,9 @@ export default function TodayScreen() {
             // 새 날짜: 입력 중이던 값은 버리고 새 응답으로 교체한다(저장해도 서버가 400 으로 거부하므로)
             applyToday(t, await readPreferMl());
             setNotice(DATE_CHANGED_NOTICE);
-            setToast(null);
+            setDailyNotice(null);
+            setDoseNotice(null);
+            setWeightAsk(null);
             setSaveError(null);
             setDoseMessage(null);
           }
@@ -252,12 +288,33 @@ export default function TodayScreen() {
     void petApi.sendEvent('today_opened', { source: params.source === 'push' ? 'push' : 'direct' });
   }, [params.source]);
 
-  // 저장 토스트는 3초 후 사라진다
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), TOAST_MS);
-    return () => clearTimeout(t);
-  }, [toast]);
+    let alive = true;
+    void AccessibilityInfo.isReduceMotionEnabled?.()?.then((on) => alive && setReduceMotion(on));
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // 큰 글씨에서는 저장 성공 안내가 스크롤 맨 위에 생기므로 화면을 맨 위로 올려 보이게 한다(움직임 줄이기면 즉시)
+  const offerShown = dailyNotice?.kind === 'offer' || dailyNotice?.kind === 'error';
+  useEffect(() => {
+    if (largeFont && offerShown) scrollRef.current?.scrollTo?.({ y: 0, animated: !reduceMotion });
+  }, [largeFont, offerShown, reduceMotion]);
+
+  /** 체중 확인 카드가 나타나면 그 위치로 스크롤한다 */
+  const scrollToNode = useCallback(
+    (node: View) => {
+      const inner = (scrollRef.current as unknown as { getInnerViewRef?: () => unknown } | null)?.getInnerViewRef?.();
+      if (!inner) return;
+      node.measureLayout?.(
+        inner as never,
+        (_x, y) => scrollRef.current?.scrollTo({ y: Math.max(0, y - 120), animated: !reduceMotion }),
+        () => {},
+      );
+    },
+    [reduceMotion],
+  );
 
   /** 웹은 DOM 캡처로 탭을 세지만 RN 은 입력 핸들러에서 센다(지표용 근사값) */
   const countTap = () => {
@@ -266,13 +323,18 @@ export default function TodayScreen() {
 
   async function toggleDose(dose: DoseView) {
     if (dose.pending) return;
-    countTap();
     const key = doseKey(dose);
+    // 접히는 동안 같은 줄의 두 번째 탭은 무시한다(더블탭이 되돌리기로 이어지지 않게)
+    if (dose.taken && Date.now() < (guardUntil.current[key] ?? 0)) return;
+    countTap();
     setDoseMessage(null);
+    setDoseNotice(null);
     invalidateSync();
 
     if (!dose.taken) {
       // 낙관적 업데이트: 바로 체크 표시 → 0.3초 뒤 한 줄로 접기
+      guardUntil.current[key] = Date.now() + COLLAPSE_DELAY_MS + SHIFT_GUARD_EXTRA_MS;
+      setFocusTarget({ key, to: 'undo' });
       setDoses((list) => markTaken(list, key, new Date().toISOString()));
       setShifting(true);
       later(() => setDoses((list) => collapseTaken(list, key)), COLLAPSE_DELAY_MS);
@@ -285,13 +347,15 @@ export default function TodayScreen() {
       } catch (err) {
         invalidateSync();
         if (err instanceof ApiError && err.code === 'ALREADY_CHECKED') {
+          setFocusTarget({ key, to: 'undo' });
           // 다른 기기에서 이미 체크함 → 체크 상태 유지, 서버 값(medLogId)으로 맞춘다
           setDoses((list) => settleDose(list, key));
           setDoseMessage('이미 체크된 약이라 화면을 맞췄어요.');
           void syncDoses();
           return;
         }
-        // 실패 → 되돌리고 안내
+        // 실패 → 되돌리고 안내. 줄이 카드로 돌아오므로 접근성 포커스도 카드로(null 로 비우면 포커스를 잃는다)
+        setFocusTarget({ key, to: 'card' });
         setDoses((list) => rollback(list, key));
         if (err instanceof ApiError && err.status === 404) {
           // 백엔드 규칙: 목록에서 뺀(비활성) 약을 체크하면 404 → 최신 목록으로 맞춘다
@@ -310,40 +374,70 @@ export default function TodayScreen() {
       return;
     }
 
-    // 체크 취소
+    // 체크 되돌리기(서버에서는 med-log 삭제)
     if (!dose.medLogId) {
       void syncDoses();
       return;
     }
     const before = { ...dose };
+    setFocusTarget({ key, to: 'card' });
     setDoses((list) => markUntaken(list, key));
     try {
       await petApi.uncheckMed(dose.medLogId);
       invalidateSync();
       setDoses((list) => applyUncheckResult(list, key));
+      setDoseNotice({ message: `${doseUndoneText(dose.name)} ${UNDO_TEXT.doseRecheckHint}`, recheckKey: key });
     } catch (err) {
       invalidateSync();
       if (err instanceof ApiError && err.status === 404) {
-        // 이미 취소된 기록 → 먼저 대기 상태를 풀고(재동기가 실패해도 잠기지 않게) 서버와 맞춘다
+        // 이미 되돌려진 기록 → 먼저 대기 상태를 풀고(재동기가 실패해도 잠기지 않게) 서버와 맞춘다
         setDoses((list) => applyUncheckResult(list, key));
+        setDoseNotice({ message: UNDO_TEXT.doseAlreadyUndone, recheckKey: null });
         void syncDoses();
         return;
       }
+      // 실패하면 줄이 다시 접히므로 접근성 포커스를 [되돌리기] 버튼으로 돌려준다(null 로 비우면 포커스를 잃는다)
+      setFocusTarget({ key, to: 'undo' });
       setDoses((list) => restoreDose(list, key, before));
       if (err instanceof ApiError && err.status === 401) return;
-      setDoseMessage(`취소하지 못했어요. ${toUserMessage(err, 'medLog')}`);
+      setDoseMessage(doseUndoFailText(toUserMessage(err, 'medLog')));
     }
   }
 
-  async function save() {
-    if (!form || !today || !petId || saving) return;
+  /** 되돌린 직후 안내의 [다시 체크]: 지금 시각으로 다시 기록한다 */
+  function recheckDose(key: string) {
+    const dose = doses.find((d) => doseKey(d) === key);
+    setDoseNotice(null);
+    if (dose && !dose.taken) void toggleDose(dose);
+  }
+
+  async function save(confirmedKg: number | null = confirmedWeight) {
+    if (!form || !today || !petId || saving || dailyNotice?.kind === 'busy') return;
     const problem = validateTodayForm(form);
     setSaveError(problem);
     if (problem) return;
+    // 체중 자릿수 확인: 지난 기록의 5배 이상·1/5 이하면 저장 전에 숫자 두 개를 나란히 보여 주고 묻는다
+    const check = checkWeightDigits({
+      text: form.weight.text,
+      measured: form.weight.measured,
+      lastKg: today.lastWeight?.weightKg ?? null,
+      savedKg: savedLog?.weightKg ?? null,
+      confirmedKg,
+    });
+    if (check.ask && today.lastWeight) {
+      const ago = daysAgoText(daysBetween(today.lastWeight.recordDate, today.recordDate));
+      setWeightAsk((prev) => ({ check, ago, tick: (prev?.tick ?? 0) + 1 }));
+      return;
+    }
+    setWeightAsk(null);
     setSaving(true);
     setNotice(null);
-    const wasFirst = isFirstUse(today) && !savedLog;
     try {
+      // 저장 직전에 서버의 실제 기록을 받아 "되돌릴 값"으로 삼는다(다른 기기가 그 사이 저장했어도 그 기록을 지우거나 낡은 값으로 덮지 않게).
+      // 받지 못하면 화면이 알던 기록(savedLog)을 쓴다. 이때도 되돌릴 때 updatedAt 비교가 다른 곳의 수정을 막아 준다.
+      const server = await petApi.getToday(petId).catch(() => null);
+      const before = server && server.recordDate === today.recordDate ? server.dailyLog : savedLog;
+      const wasFirst = isFirstUse(today) && !savedLog && !before;
       const log = await petApi.saveDailyLog(petId, today.recordDate, buildDailyLogBody(form));
       // 저장하는 동안 앱 복귀 등으로 화면이 새 날짜로 바뀌었으면 구 날짜 값을 되살리지 않는다
       if (todayRef.current?.recordDate !== today.recordDate) return;
@@ -351,7 +445,11 @@ export default function TodayScreen() {
       setToday(next);
       setSavedLog(log);
       setForm(initialTodayForm(next, form.waterMode === 'ml'));
-      setToast(wasFirst ? '첫 기록을 남겼어요. 내일 이 시간쯤 다시 만나요.' : '오늘 기록을 남겼어요. 수고하셨어요');
+      setDailyNotice({
+        kind: 'offer',
+        message: wasFirst ? UNDO_TEXT.dailyFirstSaved : before ? UNDO_TEXT.dailyEdited : UNDO_TEXT.dailySaved,
+        undo: { before, saved: log },
+      });
       void petApi.sendEvent('daily_log_saved', {
         taps: taps.current,
         durationMs: Math.round(Date.now() - openedAt.current),
@@ -373,7 +471,95 @@ export default function TodayScreen() {
     }
   }
 
+  /**
+   * 되돌리는 동안 보호자가 입력을 시작했으면(바뀐 내용이 있으면) 입력 폼은 그대로 두고 today/savedLog 만 새로 맞춘다.
+   * 바뀐 내용이 없을 때만 서버 값으로 폼을 다시 만든다.
+   */
+  function refreshFormUnlessEdited(server: TodayResponse, preferMl: boolean) {
+    const f = formRef.current;
+    const t = todayRef.current;
+    if (f && t && isFormDirty(f, initialTodayForm(t))) return;
+    setForm(initialTodayForm(server, preferMl));
+  }
+
+  /** 저장 되돌리기: 서버의 현재 기록(updatedAt)이 내가 저장한 것과 같을 때만 되돌린다(다른 곳에서 고친 기록을 덮어쓰지 않는다) */
+  async function undoDaily() {
+    const current0 = dailyNotice;
+    // 저장 중에는 되돌리지 않는다(저장 결과가 나온 뒤 새 저장 기준으로 다시 안내한다)
+    if (!current0 || (current0.kind !== 'offer' && current0.kind !== 'error') || !petId || saving) return;
+    const { undo, message } = current0;
+    const preferMl = form?.waterMode === 'ml';
+    setDailyNotice({ kind: 'busy', message, undo });
+    const finish = (text: string, tone: 'ok' | 'info') => setDailyNotice({ kind: 'result', message: text, tone });
+    try {
+      lastFetchAt.current = Date.now();
+      const current = await petApi.getToday(petId);
+      const plan = planDailyUndo(undo, current);
+      if (plan.kind === 'conflict') {
+        // 서버 값으로 화면을 맞춘다(그 사이 고친 입력이 없으므로 안전)
+        setToday(current);
+        setSavedLog(current.dailyLog);
+        refreshFormUnlessEdited(current, preferMl);
+        finish(UNDO_TEXT.dailyConflict, 'info');
+        return;
+      }
+      if (plan.kind === 'expired') {
+        finish(UNDO_TEXT.dailyExpired, 'info');
+        void load();
+        return;
+      }
+      let restored: DailyLog | null = null;
+      if (plan.kind === 'put') restored = await petApi.saveDailyLog(petId, plan.recordDate, plan.body);
+      else await petApi.deleteDailyLog(petId, plan.recordDate);
+      const next = { ...current, dailyLog: restored };
+      setToday(next);
+      setSavedLog(restored);
+      refreshFormUnlessEdited(next, preferMl);
+      finish(plan.kind === 'put' ? UNDO_TEXT.dailyRestored : UNDO_TEXT.dailyRemoved, 'ok');
+    } catch (err) {
+      const kind = classifyUndoError(err);
+      if (kind === 'auth') return;
+      if (kind === 'gone') {
+        setDailyNotice(null);
+        isPetGone(err);
+        return;
+      }
+      if (kind === 'expired') {
+        finish(UNDO_TEXT.dailyExpired, 'info');
+        void load();
+        return;
+      }
+      setDailyNotice({
+        kind: 'error',
+        message: kind === 'network' ? UNDO_TEXT.dailyFailNetwork : UNDO_TEXT.dailyFailServer,
+        undo,
+      });
+    }
+  }
+
+  /** [다시 입력]: 값은 지우지 않고 체중 칸으로 포커스를 옮겨 전체 선택한다 */
+  function retypeWeight() {
+    setWeightAsk(null);
+    const len = form?.weight.text.length ?? 0;
+    later(() => {
+      weightInputRef.current?.focus();
+      weightInputRef.current?.setSelection?.(0, len);
+    }, 50);
+  }
+
+  function keepWeight() {
+    const kg = form ? parseWeight(form.weight.text) : null;
+    setConfirmedWeight(kg);
+    setWeightAsk(null);
+    void save(kg);
+  }
+
+  /** 입력을 고치는 동작: 저장 되돌리기 안내(폼이 덮이는 사고 방지)와 낡은 체중 확인 카드를 정리한다 */
   function update(patch: Partial<TodayForm>) {
+    if (patch.weight && form && (patch.weight.text !== form.weight.text || patch.weight.measured !== form.weight.measured)) {
+      setWeightAsk(null);
+    }
+    setDailyNotice((n) => (n && n.kind !== 'result' && n.kind !== 'busy' ? null : n));
     setForm((f) => (f ? { ...f, ...patch } : f));
   }
 
@@ -381,13 +567,38 @@ export default function TodayScreen() {
     if (!form) return;
     countTap();
     void writePreferMl(mode === 'ml');
-    update({ waterMode: mode });
+    setForm((f) => (f ? { ...f, waterMode: mode } : f)); // 입력 방식만 바꾼 것이라 되돌리기 안내는 그대로 둔다
   }
 
   // ---------- 화면 ----------
   const name = pet?.name ?? '';
   const firstUse = today ? isFirstUse(today) : false;
   const saveLabel = saving ? '저장하는 중…' : savedLog ? '기록 수정하기' : firstUse ? '첫 기록 저장' : '오늘 기록 저장';
+
+  const dailyNoticeView = dailyNotice && (
+    dailyNotice.kind === 'result' ? (
+      <UndoNotice
+        key={dailyNotice.message}
+        message={dailyNotice.message}
+        tone={dailyNotice.tone === 'ok' ? 'ok' : 'error'}
+        autoDismissMs={UNDO_RESULT_MS}
+        onDismiss={() => setDailyNotice((n) => (n?.kind === 'result' ? null : n))}
+      />
+    ) : (
+      <UndoNotice
+        message={dailyNotice.message}
+        tone={dailyNotice.kind === 'error' ? 'error' : 'ok'}
+        actionLabel={dailyNotice.kind === 'error' ? UNDO_TEXT.dailyRetry : UNDO_TEXT.dailyUndoButton}
+        busy={dailyNotice.kind === 'busy'}
+        disabled={saving}
+        disabledNote={UNDO_TEXT.dailyUndoWhileSaving}
+        busyLabel={UNDO_TEXT.dailyUndoBusy}
+        onAction={() => void undoDaily()}
+        closeLabel={UNDO_TEXT.close}
+        onClose={dailyNotice.kind === 'busy' ? undefined : () => setDailyNotice(null)}
+      />
+    )
+  );
 
   return (
     <Screen
@@ -404,9 +615,10 @@ export default function TodayScreen() {
       footer={
         <SaveBar
           label={saveLabel}
-          toast={toast}
+          notice={largeFont ? null : dailyNoticeView}
+          hint={weightAsk ? UNDO_TEXT.weightBarHint : null}
           error={saveError}
-          disabled={!form}
+          disabled={!form || dailyNotice?.kind === 'busy'}
           saving={saving}
           onSave={() => void save()}
         />
@@ -417,6 +629,8 @@ export default function TodayScreen() {
         petName={name}
         info={buildHeaderInfo(pet, today)}
       />
+
+      {largeFont && dailyNoticeView}
 
       {notice && (
         <AppText accessibilityLiveRegion="polite" style={styles.bold}>
@@ -457,6 +671,11 @@ export default function TodayScreen() {
             onManage={goManage}
             onHistory={goHistory}
             onAdd={goAddMedication}
+            notice={doseNotice}
+            onRecheck={recheckDose}
+            onDismissNotice={() => setDoseNotice(null)}
+            focusTarget={focusTarget}
+            onFocused={() => setFocusTarget(null)}
           />
 
           {/* 투약 카드가 접히는 동안 아래 영역 입력을 잠시 막는다 */}
@@ -520,7 +739,20 @@ export default function TodayScreen() {
                 countTap();
                 update({ weight: { ...form.weight, measured: !form.weight.measured } });
               }}
-            />
+              inputRef={weightInputRef}
+            >
+              {weightAsk && (
+                <WeightConfirm
+                  key={weightAsk.tick}
+                  check={weightAsk.check}
+                  ago={weightAsk.ago}
+                  disabled={saving}
+                  onRetype={retypeWeight}
+                  onKeep={keepWeight}
+                  onShown={scrollToNode}
+                />
+              )}
+            </WeightSection>
 
             <MemoSection value={form.memo} onChange={(memo) => update({ memo })} />
 

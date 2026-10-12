@@ -104,6 +104,14 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 큰 글씨: 1.3배 이상 표 행을 세로 배치, 2.0배 이상 또는 스크린리더가 켜져 있으면 날짜별 체중 표가 기본 펼침(그 외 접힘). 그래프는 한 덩어리 접근성 요소(요약 문장) + 아래 표/행 목록이 값을 읽어 준다. 요약 문장은 항상 그래프보다 위.
 - 확인하지 못한 것: 에뮬레이터·실기기에서의 화면/공유 시트 동작(Jest 컴포넌트 테스트와 `expo export --platform web` 번들만 확인), iOS, TalkBack/VoiceOver 실제 읽기 순서.
 
+## 저장 되돌리기·실수 방지 (2026-10-12)
+웹과 같은 규칙(웹 README 참고). 공유 사본 `lib/undoLogic·undoText·todayForm(isFormDirty)·petApi(deleteDailyLog)`(+테스트 `undoLogic·undoText·formDirty`). 앱 전용 부품 `components/UndoNotice`·`ConfirmCard`, `today/sections/WeightConfirm`.
+- 투약 접힌 줄은 `되돌리기` 버튼만 반응, 되돌린 직후 `다시 체크` 안내(10초, 스크린리더가 켜져 있으면 닫을 때까지 유지).
+- 일일 기록 저장 직후 `저장 되돌리기`: `SaveBar` 안에 표시, 글자 배율 1.3 이상이면 스크롤 맨 위로 옮기고 저장 막대에는 버튼만(움직임 줄이기 설정이면 즉시 이동). 결과 안내 8초. 저장 중에는 `저장 되돌리기` 버튼이 비활성(접근성 disabled 상태)이고 "저장하는 중에는 되돌릴 수 없어요." 문구를 보인다. 저장이 끝나면 새 저장 기준 안내로 교체된다.
+- 체중 자릿수 확인 카드(지난 기록의 5배 이상·1/5 이하).
+- 모바일 이탈 확인은 넣지 않았다(화면이 쌓여 입력이 유지됨, 기획 Q8). `AppInput` 에 `inputRef` 추가.
+- 에뮬레이터에서 실제 화면은 확인하지 못했다(Metro 번들이 25%에서 멈춤). 실기기·TalkBack 확인 필요.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
@@ -146,7 +154,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 2. 반려동물 등록·선택, 사진 업로드(`expo-image-picker`, MVP 결정 2).
 3. **푸시 알림(투약 알림):** `@react-native-firebase/messaging` 으로 구현됨. 알림 규칙(켜기/끄기·매일/요일/N일 간격·기간)은 앱의 약 관리 → 알림 설정 화면에서 정한다(웹과 같은 기능). 개발 빌드(`npx expo prebuild` + `npx expo run:android`)와 `google-services.json`(앱 루트, git 제외, 패키지명 `com.oraegyeot.seniorpet`)이 필요하다. Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 알림만 꺼진다. 플랫폼별로 따로 판단하며 한쪽 파일만 있으면 경고를 출력하고 그쪽만 켠다. **EAS 클라우드 빌드**는 git 에 없는 설정 파일이 올라가지 않으므로 file secret 으로 넣는다: `eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`(iOS 는 `GOOGLE_SERVICE_INFO_PLIST`). app.config.ts 가 이 환경변수 경로를 읽는다. iOS 는 `GoogleService-Info.plist` + APNs 키 + Apple 개발자 팀 필요(미검증).
 4. `packages/shared` 통합 (위 계획).
-5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 546개(2026-10-08 병원 방문 리포트 추가 후).
+5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 621개·52 스위트(2026-10-12 저장 되돌리기·QA 추가 후).
    jest 의 기본 글자 배율(fontScale)은 2 라서 평소 배치를 볼 때는 `testing/fontScale.ts` 의 `setFontScale(1)` 을 쓴다. expo-router·선택기는 `testing/mockRouter.ts`·`testing/mockDateTimePicker.tsx` 로 대체한다.
 6. 운영 API 는 반드시 `https://` 로. 정식(릴리스) 빌드의 안드로이드는 기본적으로 `http://` 통신을 막는다.
 

@@ -286,12 +286,16 @@ describe('오늘 화면 — 투약 체크', () => {
     await screen.findByText('오늘 먹일 약 2 / 2');
   });
 
-  it('체크한 약을 다시 탭하면 DELETE 로 취소한다', async () => {
+  it('접힌 줄은 [되돌리기] 버튼만 반응하고, 누르면 DELETE 로 되돌린 뒤 [다시 체크]를 안내한다', async () => {
     setup((r) => (r.method === 'DELETE' ? json(204, null) : undefined));
     await renderToday();
-    await fireEvent.press(screen.getByRole('checkbox', { name: /오전 8:00 아조딜 1캡슐, 8:05 먹임/ }));
+    expect(screen.queryByRole('checkbox', { name: /오전 8:00/ })).toBeNull(); // 접힌 줄 전체는 눌러도 반응하지 않는다
+    expect(screen.getByText(/8:05 먹임/)).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: /아조딜 1캡슐 오전 8:00 체크 되돌리기/ }));
     await screen.findByText('오늘 먹일 약 0 / 2');
     expect(calls.some((c) => c.method === 'DELETE' && c.url === '/api/med-logs/log-1')).toBe(true);
+    expect(await screen.findByText(/아조딜 체크를 되돌렸어요\. 다시 체크하면 지금 시각으로 기록돼요\./)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '다시 체크' })).toBeTruthy();
   });
 });
 
@@ -389,7 +393,7 @@ describe('오늘 화면 — 푸시로 열었을 때', () => {
     setup();
     await renderToday();
     expect(screen.getByRole('checkbox', { name: /^방금 알림 온 약, .*오후 8:00/ })).toBeTruthy();
-    expect(screen.getByRole('checkbox', { name: /^오전 8:00/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /오전 8:00 체크 되돌리기$/ })).toBeTruthy();
   });
 
   it('2분 뒤 강조가 풀리고, 같은 약이라도 알림을 다시 열면(n 이 바뀌면) 다시 강조하고 2분 뒤 다시 풀린다', async () => {

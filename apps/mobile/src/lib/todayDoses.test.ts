@@ -114,7 +114,7 @@ describe('알림 강조', () => {
 describe('문구', () => {
   it('doseLabel 두 상태', () => {
     expect(doseLabel(TODO)).toBe('오후 8:00 아조딜 1캡슐, 아직 체크하지 않았어요. 누르면 먹였어요로 체크해요');
-    expect(doseLabel(DONE)).toBe('오전 8:00 아조딜 1캡슐, 8:05 먹임. 누르면 체크를 취소해요');
+    expect(doseLabel(DONE)).toBe('오전 8:00 아조딜 1캡슐, 8:05 먹임. 누르면 체크를 되돌려요');
   });
 
   it('doseLabel: 용량이 없으면 이름만, 체크 시각이 없으면 "먹임"', () => {

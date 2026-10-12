@@ -1,5 +1,6 @@
 // 체중(선택): − / 입력 / + 스테퍼, 제안값·지난 기록, [오늘 쟀어요] 토글
-import { StyleSheet, View } from 'react-native';
+import type { ReactNode } from 'react';
+import { StyleSheet, View, type TextInput } from 'react-native';
 import { AppButton, AppInput, AppText, ChoiceButton } from '../../components/ui';
 import { daysBetween, formatKg } from '../../lib/format';
 import type { TodayForm } from '../../lib/todayForm';
@@ -13,6 +14,8 @@ export function WeightSection({
   onStep,
   onChangeText,
   onToggleMeasured,
+  inputRef,
+  children,
 }: {
   weight: TodayForm['weight'];
   lastWeight: { weightKg: number; recordDate: string } | null;
@@ -20,6 +23,10 @@ export function WeightSection({
   onStep: (delta: number) => void;
   onChangeText: (raw: string) => void;
   onToggleMeasured: () => void;
+  /** 체중 입력칸 참조(체중 숫자 확인의 [다시 입력]이 포커스·전체 선택에 쓴다) */
+  inputRef?: { current: TextInput | null };
+  /** [오늘 쟀어요] 아래에 끼우는 체중 숫자 확인 카드 */
+  children?: ReactNode;
 }) {
   return (
     <View style={styles.wrap}>
@@ -44,6 +51,7 @@ export function WeightSection({
         <View style={styles.unit}>
           <AppInput
             accessibilityLabel="체중 (kg)"
+            inputRef={inputRef}
             keyboardType="decimal-pad"
             dashed={!weight.measured && weight.suggested}
             value={weight.text}
@@ -72,6 +80,7 @@ export function WeightSection({
       {!weight.measured && (
         <AppText variant="caption">[오늘 쟀어요]를 누르거나 숫자를 바꾸면 오늘 체중으로 저장돼요.</AppText>
       )}
+      {children}
     </View>
   );
 }
