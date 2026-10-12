@@ -2,18 +2,26 @@ import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'r
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth';
 import PetAvatar from '../components/PetAvatar';
-import { ApiError, toUserMessage } from '../lib/api';
+import { toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
 import { DISCLAIMER } from '../lib/constants';
-import type { Pet, PetInput, Species } from '../lib/petApi';
+import {
+  birthYearOptions,
+  classifyPetSaveError,
+  draftFromPet,
+  hasPetFieldErrors,
+  PET_CONDITIONS_MAX,
+  PET_NAME_MAX,
+  toPetInput,
+  validatePetDraft,
+  type PetFieldErrors,
+} from '../lib/petForm';
+import type { Pet, Species } from '../lib/petApi';
 import { PHOTO_HINT, validatePhoto } from '../lib/photo';
 import { usePet } from '../pet';
 
 // 반려동물 등록(/pets/new, 온보딩 1/2) · 프로필 수정(/pet)
-// 이름(필수), 개/고양이(필수), 태어난 해·질환·사진(선택)
-const NAME_MAX = 30;
-const CONDITIONS_MAX = 200;
-const MIN_YEAR = 1980;
+// 이름(필수), 개/고양이(필수), 태어난 해·질환·사진(선택). 검증·변환·오류 분류는 lib/petForm.ts
 
 export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const { pet, status, setPet, reload } = usePet();
@@ -26,11 +34,12 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
   const isNew = mode === 'new';
   const editing = isNew ? null : pet;
 
-  const [name, setName] = useState(editing?.name ?? '');
-  const [species, setSpecies] = useState<Species | null>(editing?.species ?? null);
-  const [birthYear, setBirthYear] = useState<string>(editing?.birthYear ? String(editing.birthYear) : '');
-  const [conditions, setConditions] = useState(editing?.conditions ?? '');
-  const [fieldError, setFieldError] = useState<{ name?: string; species?: string }>({});
+  const [initial] = useState(() => draftFromPet(editing));
+  const [name, setName] = useState(initial.name);
+  const [species, setSpecies] = useState<Species | null>(initial.species);
+  const [birthYear, setBirthYear] = useState<string>(initial.birthYear);
+  const [conditions, setConditions] = useState(initial.conditions);
+  const [fieldError, setFieldError] = useState<PetFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(
     (location.state as { notice?: string } | null)?.notice ?? null,
@@ -54,9 +63,7 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
     return () => URL.revokeObjectURL(url);
   }, [photoFile]);
 
-  const thisYear = new Date().getFullYear();
-  const years: number[] = [];
-  for (let y = thisYear; y >= MIN_YEAR; y--) years.push(y);
+  const years = birthYearOptions(new Date().getFullYear());
 
   function onPickPhoto(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] ?? null;
@@ -68,37 +75,26 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
   }
 
   function handleError(err: unknown, context: 'pet' | 'photo') {
-    if (err instanceof ApiError && err.status === 404 && !isNew) {
-      void reload(); // pet 이 없어졌으면 등록 화면으로
+    const failure = classifyPetSaveError(err, isNew, context);
+    if (failure.kind !== 'message') {
+      void reload(); // pet 이 없어졌으면 등록 화면으로, 이미 등록돼 있으면 오늘 화면으로
       return;
     }
-    if (err instanceof ApiError && err.code === 'PET_LIMIT_REACHED') {
-      void reload(); // 이미 등록돼 있으면 오늘 화면으로
-      return;
-    }
-    const message = toUserMessage(err, context);
-    if (context === 'photo') setPhotoError(message);
-    else setFormError(message);
+    if (context === 'photo') setPhotoError(failure.message);
+    else setFormError(failure.message);
   }
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (submitting) return;
-    const errors: { name?: string; species?: string } = {};
-    if (!name.trim()) errors.name = '이름을 적어 주세요.';
-    else if (name.trim().length > NAME_MAX) errors.name = `이름은 ${NAME_MAX}자까지 적을 수 있어요.`;
-    if (!species) errors.species = '개인지 고양이인지 골라 주세요.';
+    const draft = { name, species, birthYear, conditions };
+    const errors = validatePetDraft(draft);
     setFieldError(errors);
     setFormError(null);
     setNotice(null);
-    if (Object.keys(errors).length > 0 || !species) return;
+    const input = toPetInput(draft);
+    if (hasPetFieldErrors(errors) || !input) return;
 
-    const input: PetInput = {
-      name: name.trim(),
-      species,
-      birthYear: birthYear ? Number(birthYear) : null,
-      conditions: conditions.trim() ? conditions.trim() : null,
-    };
     setSubmitting(true);
     try {
       if (isNew) {
@@ -199,7 +195,7 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
           <input
             id="pet-name"
             value={name}
-            maxLength={NAME_MAX}
+            maxLength={PET_NAME_MAX}
             autoComplete="off"
             placeholder="예: 보리"
             onChange={(e) => setName(e.target.value)}
@@ -251,7 +247,7 @@ export default function PetFormPage({ mode }: { mode: 'new' | 'edit' }) {
           <input
             id="pet-conditions"
             value={conditions}
-            maxLength={CONDITIONS_MAX}
+            maxLength={PET_CONDITIONS_MAX}
             placeholder="예: 신부전, 심장병"
             onChange={(e) => setConditions(e.target.value)}
           />

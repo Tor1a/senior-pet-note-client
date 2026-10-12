@@ -91,7 +91,7 @@ src/
 ├─ components/PetAvatar.tsx # 원형 사진, 없으면 🐾
 ├─ pages/
 │  ├─ TodayPage.tsx         # "오늘" 기록 화면 (+ TodayPage.test.tsx 화면 테스트)
-│  ├─ PetFormPage.tsx       # 반려동물 등록·프로필 수정(사진 미리보기·교체·삭제)
+│  ├─ PetFormPage.tsx       # 반려동물 등록·프로필 수정(사진 미리보기·교체·삭제). 검증·본문 변환·저장 오류 분류는 lib/petForm.ts
 │  ├─ MedicationsPage.tsx   # 약 관리
 │  └─ LoginPage, ServerDownPage, SetupNeededPage
 └─ lib/
@@ -100,6 +100,7 @@ src/
    ├─ client.ts             # 앱 공용 클라이언트 인스턴스(api, petApi)
    ├─ todayForm.ts          # 오늘 화면 입력 상태(제안값/확정값 구분, 저장 본문 만들기)
    ├─ symptoms.ts           # "특이사항 없음" 기본 선택, 토글·저장 변환
+   ├─ petForm.ts            # 반려동물 폼 입력 검증·본문 변환·변경 여부·저장 오류 분류(사진 제외, 모바일 사본 있음)
    ├─ format.ts             # 날짜·시각·조사 표시 형식
    ├─ photo.ts              # 사진 형식·5MB 확인
    └─ constants.ts, config.ts, tokenStorage.ts, loginForm.ts
@@ -153,15 +154,17 @@ src/
 
 ## 테스트
 
-`npm test` — 50개 파일, 605개 (2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA 포함. 아래 목록은 초기 6개 파일 내역).
+`npm test` — 52개 파일, 643개 (2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA·반려동물 폼 추출 포함. 아래 목록은 초기 6개 파일 내역).
 
 - `pages/TodayPage.test.tsx` (14): 계약서 예시 JSON 으로 fetch 를 가짜로 바꿔 화면을 검사한다.
   제안값 점선 표시와 저장 시 확정, 저장 본문이 계약 8개 필드와 일치, 저장된 기록은 실선, 체중 저장 조건, 첫 사용 상태,
   "특이사항 없음" 자동 해제, 투약 낙관적 업데이트·실패 롤백·409 동기화·취소, pet 404, 저장 400 안내, 서버 꺼짐, 이벤트 실패 무시.
+- `pages/PetFormPage.test.tsx` (18, 이름 30자 = UTF-16 길이 경계 포함): 반려동물 등록·수정 화면의 현재 동작 고정(검증 문구, 저장 본문, 400·연결 실패·409·404 처리, 중복 제출) — `lib/petForm.ts` 추출 전에 작성해 추출 후에도 그대로 통과한다. `lib/petForm.test.ts` (20, 한글 30/31자·이모지 15/16개). 사진 부분은 테스트하지 않는다.
 - `lib/todayForm.test.ts` (7), `lib/symptoms.test.ts` (6), `lib/api.test.ts` (10), `lib/loginForm.test.ts` (5), `lib/config.test.ts` (3).
 
 ## 아직 안 한 것 / 알려진 한계
 
+- 웹 반려동물 등록의 409 `PET_LIMIT_REACHED` 는 말없이 다시 읽어 오늘 화면으로 간다(모바일은 "이미 등록된 반려동물이 있어요…" 안내를 붙였다). 웹 쪽 보정은 하지 않았다.
 - 하단 탭바는 넣지 않았다(오늘 화면의 `지난 기록` 링크와 맨 아래 `지난 기록 보기 ›` 행으로 진입). 메뉴(≡)는 프로필 화면으로 간다.
 - 지난 기록 보기(`/history`, `/history/:recordDate`): 서버 30일치를 한 번 받아 7일/30일은 화면에서 자른다. 체중 선 그래프는 직접 그린 `<svg>`(`components/WeightChart.tsx`, 좌표는 `lib/chartGeometry.ts`), `표로 보기` 토글, 그래프에서 ←/→ 키로 기록 이동. 읽기 전용이며 투약은 "현재 등록된 약 기준" 횟수만 보여 준다(퍼센트·평가 표현 없음).
 - 병원 방문 리포트(`/report?range=7|14|30&from=history`, 2026-10-08): 진료 때 수의사에게 건네는 요약 1~2장. 지난 기록과 **같은 `GET daily-logs` 1번 + 약 목록**으로 만들고(신규 API 없음, 백엔드 변경 없음) 7/14/30일(기본 14일) 전환은 재요청 없이 자른다. 집계 `lib/reportStats.ts`(체중 첫·마지막·최소·최대, 기록 없는 날, 메모, 기존 `historyStats` 재사용), 문구·조립 `lib/reportText.ts`(`REPORT_FORBIDDEN` = 기존 `findForbidden` + 상의·권·병원에 가·진료받·필요해·의심·심각·이상 없, 사용자 입력은 검사 제외), 화면 `pages/ReportPage.tsx` + `components/ReportSheet.tsx`. 인쇄는 `window.print()` + `styles.css` 의 `@media print`(A4 세로·흑백·11pt/9.5pt·섹션 `break-inside: avoid`·그래프 옆 체중 표·쪽마다 면책 바닥글·`.no-print` 숨김). PDF 는 브라우저 인쇄 창의 "PDF로 저장"(앱이 파일을 만들지 않음). 기간·메모 옵션은 저장하지 않는다(매번 14일, 메모 포함). 오늘 화면 맨 아래 카드와 지난 기록 화면의 `병원 방문 리포트 만들기 ›` 에서 들어간다. 메모 켜짐/꺼짐은 본문에서 즉시 반영된다. 증상·메모는 12건까지 보이고 넘으면 "나머지 n건은 앱에서 볼 수 있어요."로 알린다.
