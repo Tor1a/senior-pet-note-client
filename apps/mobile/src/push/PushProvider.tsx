@@ -8,7 +8,7 @@ import { AppState, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppButton, AppText } from '../components/ui';
 import { formatTime } from '../lib/format';
-import { parseMedReminderData } from '../lib/reminderApi';
+import { parseMedReminderData, type MedReminderData } from '../lib/reminderApi';
 import { push } from '../services/push';
 import type { PushMessage } from '../services/pushTypes';
 import { RegistrationSupersededError } from '../lib/pushDevice';
@@ -104,7 +104,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
   // 스택 맨 아래의 오늘 화면까지 되돌아가며(POP_TO, 한 번의 이동) 알림 파라미터를 싣는다.
   // 저장 안 한 알림 설정이 있으면 그 화면의 이탈 확인 카드가 먼저 뜬다(의도).
   const goToday = useCallback(
-    (medicationId?: string) => router.dismissTo(todayPushHref(medicationId, nextOpenNonce()) as never),
+    (target?: MedReminderData) => router.dismissTo(todayPushHref(target, nextOpenNonce()) as never),
     [router],
   );
 
@@ -113,7 +113,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
     if (!push.available) return;
     const openToday = (msg: PushMessage) => {
       const data = parseMedReminderData(msg.data);
-      if (data) goToday(data.medicationId);
+      if (data) goToday(data);
     };
     const offs = [
       push.onTokenRefresh(() => void recheck()),
@@ -161,7 +161,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
           onOpenToday={() => {
             const last = messages[messages.length - 1];
             setMessages([]);
-            goToday(last?.medicationId);
+            goToday(last);
           }}
         />
       )}

@@ -128,7 +128,7 @@ describe('PushProvider — 알림 탭 이동', () => {
       });
     });
     expect(mockRouter.dismissTo).toHaveBeenCalledTimes(1);
-    expect(mockRouter.dismissTo.mock.calls[0][0]).toMatch(/^\/\?source=push&med=med-1&n=/);
+    expect(mockRouter.dismissTo.mock.calls[0][0]).toMatch(/^\/\?source=push&med=med-1&t=08%3A00&d=2026-10-08&n=/); // 알림이 가리킨 회차를 싣는다
     expect(mockRouter.replace).not.toHaveBeenCalled();
   });
 });

@@ -98,6 +98,15 @@ export function parseMedReminderData(data: unknown): MedReminderData | null {
 
 const enc = encodeURIComponent;
 
+/**
+ * 알림이 가리킨 회차를 오늘 화면 주소에 싣는 쿼리 조각(알림-바로-체크): `&med=<약>&t=<시각>&d=<기록 날짜>`.
+ * 오늘 화면이 "약·시각이 모두 맞는 회차"만 강조하고, d 가 오늘 응답의 recordDate 와 다르면(어제 알림) 강조하지 않게 한다.
+ * 웹 서비스워커·웹/모바일 PushProvider 가 같은 규칙으로 만든다.
+ */
+export function medTargetQuery(data: Pick<MedReminderData, 'medicationId' | 'scheduledTime' | 'recordDate'>): string {
+  return `&med=${enc(data.medicationId)}&t=${enc(data.scheduledTime)}&d=${enc(data.recordDate)}`;
+}
+
 export function createReminderApi(client: ApiClient) {
   return {
     getReminder: (medicationId: string) =>

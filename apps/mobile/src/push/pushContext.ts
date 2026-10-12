@@ -1,7 +1,7 @@
 // 푸시 상태 Context 와 훅 (PushProvider 와 화면 프레임이 함께 쓴다)
 // - ui.tsx(Screen)가 bannerVisible 을 읽어야 해서 Provider 와 분리했다(Provider 는 ui.tsx 를 쓰므로 한 파일에 두면 순환 참조).
 import { createContext, useContext, useEffect, useRef } from 'react';
-import type { MedReminderData } from '../lib/reminderApi';
+import { medTargetQuery, type MedReminderData } from '../lib/reminderApi';
 
 export type PushDeviceState = 'checking' | 'unavailable' | 'default' | 'denied' | 'registering' | 'registered' | 'error';
 
@@ -62,10 +62,10 @@ let openSeq = 0;
 export const nextOpenNonce = () => `${Date.now().toString(36)}${(openSeq++).toString(36)}`;
 
 /**
- * 알림 탭·배너 버튼으로 갈 곳. 해당 약을 강조할 수 있도록 medicationId 를 싣고,
+ * 알림 탭·배너 버튼으로 갈 곳. 알림이 가리킨 회차(약·시각·기록 날짜)를 싣고,
  * nonce(n)로 같은 약을 다시 열어도 화면이 새 알림으로 알아보게 한다.
  */
-export const todayPushHref = (medicationId?: string, nonce?: string) =>
-  medicationId
-    ? `${TODAY_PUSH_HREF}&med=${encodeURIComponent(medicationId)}${nonce ? `&n=${encodeURIComponent(nonce)}` : ''}`
-    : TODAY_PUSH_HREF;
+export const todayPushHref = (
+  target?: Pick<MedReminderData, 'medicationId' | 'scheduledTime' | 'recordDate'>,
+  nonce?: string,
+) => (target ? `${TODAY_PUSH_HREF}${medTargetQuery(target)}${nonce ? `&n=${encodeURIComponent(nonce)}` : ''}` : TODAY_PUSH_HREF);

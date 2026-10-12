@@ -4,7 +4,8 @@ import { useEffect, useRef } from 'react';
 import { AccessibilityInfo, findNodeHandle, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { UndoNotice } from '../../components/UndoNotice';
 import { AppButton, AppText, Card } from '../../components/ui';
-import { doseKey, doseLabel, doseParts, type DoseView } from '../../lib/todayDoses';
+import { bigDoseButtonLabel, PUSH_ACTION_TEXT } from '../../lib/pushActionText';
+import { doseKey, doseLabel, doseParts, orderWithPinned, type DoseView } from '../../lib/todayDoses';
 import { doseUndoButtonLabel, UNDO_TEXT } from '../../lib/undoText';
 import { UNDO_ACTION_MS, UNDO_RESULT_MS } from '../../lib/undoLogic';
 import { colors, spacing, touch } from '../../theme';
@@ -15,6 +16,10 @@ interface DoseSectionProps {
   cutoffNotice: string;
   message: string | null;
   highlightKey: string | null;
+  /** 큰 [먹였어요]를 붙일 회차 key(알림이 가리킨 회차. 강조가 끝나도 유지한다) */
+  bigKey?: string | null;
+  /** 알림으로 열었을 때 맨 위로 올릴 회차 key(없으면 서버 순서 그대로) */
+  pinnedKey?: string | null;
   onToggle: (dose: DoseView) => void;
   /** 강조된 카드가 생기면 화면이 그 위치로 스크롤·포커스를 옮긴다 */
   onHighlight: (node: View) => void;
@@ -38,6 +43,8 @@ export function DoseSection({
   cutoffNotice,
   message,
   highlightKey,
+  bigKey = null,
+  pinnedKey = null,
   onToggle,
   onHighlight,
   onManage,
@@ -70,11 +77,12 @@ export function DoseSection({
           {takenCount === doses.length && (
             <AppText style={[styles.bold, { color: colors.done }]}>{`▣ 오늘 약 ${doses.length}개 모두 먹였어요`}</AppText>
           )}
-          {doses.map((d) => (
+          {orderWithPinned(doses, pinnedKey).map((d) => (
             <DoseItem
               key={doseKey(d)}
               dose={d}
-              highlight={doseKey(d) === highlightKey}
+              highlight={doseKey(d) === highlightKey && !d.taken}
+              bigButton={doseKey(d) === bigKey}
               onToggle={() => onToggle(d)}
               onHighlight={onHighlight}
               focusWanted={focusTarget?.key === doseKey(d) ? focusTarget.to : null}
@@ -117,6 +125,7 @@ export function DoseSection({
 function DoseItem({
   dose,
   highlight,
+  bigButton,
   onToggle,
   onHighlight,
   focusWanted,
@@ -124,6 +133,8 @@ function DoseItem({
 }: {
   dose: DoseView;
   highlight: boolean;
+  /** 알림이 가리킨 회차에 큰 [먹였어요]를 붙일지(체크하면 카드가 접히며 함께 사라진다) */
+  bigButton: boolean;
   onToggle: () => void;
   onHighlight: (node: View) => void;
   focusWanted: 'undo' | 'card' | null;
@@ -194,7 +205,7 @@ function DoseItem({
 
   return (
     <View>
-      {highlight && <AppText style={[styles.bold, { color: colors.primary }]}>방금 알림 온 약</AppText>}
+      {highlight && <AppText style={[styles.bold, { color: colors.primary }]}>{PUSH_ACTION_TEXT.highlightFlag}</AppText>}
       <Pressable
         ref={ref}
         {...a11y}
@@ -220,8 +231,21 @@ function DoseItem({
             <AppText>{what}</AppText>
           )}
         </View>
-        <AppText style={styles.bold}>{dose.taken ? takenText : '먹였어요'}</AppText>
+        <AppText style={styles.bold}>{dose.taken ? takenText : PUSH_ACTION_TEXT.actionLabel}</AppText>
       </Pressable>
+      {/* 알림이 가리킨 회차: 카드 아래에 폭 전체의 큰 [먹였어요]를 바로 보여 준다(알림-바로-체크 설계 6-2).
+          체크한 직후(접히기 전 0.3초)에도 그대로 두어 카드 높이와 접근성 포커스가 튀지 않게 하고, 줄이 접히면 함께 사라진다.
+          2분 강조가 끝나도 남겨 둔다: 손가락 밑에서 카드 높이가 바뀌지 않게 */}
+      {bigButton && (
+        <View style={styles.bigButton}>
+          <AppButton
+            label={PUSH_ACTION_TEXT.actionLabel}
+            accessibilityLabel={bigDoseButtonLabel(what, time)}
+            disabled={dose.pending || dose.taken}
+            onPress={onToggle}
+          />
+        </View>
+      )}
     </View>
   );
 }
@@ -244,6 +268,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.surface,
   },
+  bigButton: { marginTop: spacing.sm },
   cardTaken: { borderColor: colors.done },
   cardHighlight: { borderWidth: 3, borderColor: colors.primary },
   box: {

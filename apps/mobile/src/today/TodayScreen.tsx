@@ -18,19 +18,22 @@ import {
   COLLAPSE_DELAY_MS,
   collapseTaken,
   daysAgoText,
+  decidePushHold,
   doseKey,
   headerInfo as buildHeaderInfo,
   HIGHLIGHT_MS,
+  holdKeys,
   markTaken,
   markUntaken,
   mergeServerDoses,
-  pickHighlightKey,
+  pushTargetFromParams,
   restoreDose,
   rollback,
   settleDose,
   SHIFT_GUARD_EXTRA_MS,
   toDoseViews,
   type DoseView,
+  type PushHold,
 } from '../lib/todayDoses';
 import {
   buildDailyLogBody,
@@ -86,7 +89,7 @@ export const DATE_CHANGED_NOTICE = '새 날짜가 되어 화면을 새로 불러
 
 export default function TodayScreen() {
   const { pet, reload: reloadPet } = usePet();
-  const params = useLocalSearchParams<{ source?: string; med?: string; n?: string }>();
+  const params = useLocalSearchParams<{ source?: string; med?: string; t?: string; d?: string; n?: string }>();
   const router = useRouter();
   const goManage = useCallback(() => router.push(MEDICATIONS_HREF as never), [router]);
   const goHistory = useCallback(() => router.push(HISTORY_HREF as never), [router]);
@@ -250,9 +253,14 @@ export default function TodayScreen() {
     return () => sub.remove();
   }, [petId, applyToday, isPetGone]);
 
-  // 알림 탭(?source=push&med=<medicationId>): 해당 약의 아직 안 먹인 회차 카드를 2분간 강조한다(없는 id 면 무시)
+  // 알림 탭(?source=push&med=<medicationId>&t=<scheduledTime>&d=<recordDate>): 알림이 가리킨 "그 회차" 카드를 2분간 강조하고 큰 [먹였어요]를 붙인다.
+  // 약·시각이 모두 맞는 회차만 고르고, d 가 오늘 응답의 recordDate 와 다르면(어제 알림) 강조하지 않는다. t 가 없는 옛 URL 은 강조만 한다.
   // n 은 알림이 열릴 때마다 바뀌는 값(nonce): 같은 약을 다시 탭해도 강조와 2분 타이머가 다시 시작된다
   const medParam = params.source === 'push' && params.med ? params.med : null;
+  const target = useMemo(
+    () => pushTargetFromParams(medParam, params.t, params.d),
+    [medParam, params.t, params.d],
+  );
   const openNonce = params.n ?? null;
   const [highlightExpired, setHighlightExpired] = useState(false);
   useEffect(() => {
@@ -261,10 +269,17 @@ export default function TodayScreen() {
     const t = setTimeout(() => setHighlightExpired(true), HIGHLIGHT_MS);
     return () => clearTimeout(t);
   }, [medParam, openNonce]);
-  const highlightKey = useMemo(
-    () => pickHighlightKey(doses, medParam, highlightExpired),
-    [medParam, highlightExpired, doses],
-  );
+  // 처음 정한 회차를 저장해 고정한다: 렌더마다 "그 약의 아직 안 먹인 첫 회차"를 다시 고르지 않는다(체크해도 같은 약의 다음 회차로 옮겨 가지 않는다).
+  // 처음 그릴 때부터 맞는 순서가 되도록 렌더 중에 고르고 effect 로 저장한다. 알림을 다시 눌러 열면(n 이 바뀌면) 다시 고른다
+  const pinSig = target ? `${target.medicationId}#${target.scheduledTime ?? ''}#${target.recordDate ?? ''}#${openNonce ?? ''}` : '';
+  const [held, setHeld] = useState<{ sig: string; hold: PushHold } | null>(null);
+  const keptHold = held && held.sig === pinSig ? held.hold : null;
+  const hold = target ? (keptHold ?? decidePushHold(doses, target, today?.recordDate ?? null)) : null;
+  useEffect(() => {
+    if (hold && !keptHold) setHeld({ sig: pinSig, hold });
+  }, [hold, keptHold, pinSig]);
+  const { highlightKey, bigKey } = holdKeys(hold, highlightExpired);
+  const pinnedKey = hold?.key ?? null;
 
   /** 강조된 카드로 스크롤하고 VoiceOver/TalkBack 포커스를 옮긴다(웹의 scrollIntoView + focus) */
   const revealCard = useCallback((node: View) => {
@@ -666,6 +681,8 @@ export default function TodayScreen() {
             cutoffNotice={today.cutoffNotice}
             message={doseMessage}
             highlightKey={highlightKey}
+            bigKey={bigKey}
+            pinnedKey={pinnedKey}
             onToggle={(d) => void toggleDose(d)}
             onHighlight={revealCard}
             onManage={goManage}

@@ -72,9 +72,10 @@ describe('키보드 대응', () => {
 });
 
 describe('알림 이동 주소', () => {
-  it('todayPushHref: med 가 있으면 n(nonce)을 함께 싣고, 열 때마다 nonce 가 다르다', () => {
-    expect(todayPushHref('m1')).toBe('/?source=push&med=m1');
-    expect(todayPushHref('m1', 'abc')).toBe('/?source=push&med=m1&n=abc');
+  it('todayPushHref: 알림이 가리킨 회차(약·시각·기록 날짜)와 n(nonce)을 싣고, 열 때마다 nonce 가 다르다', () => {
+    const turn = { medicationId: 'm1', scheduledTime: '20:00', recordDate: '2026-10-06' };
+    expect(todayPushHref(turn)).toBe('/?source=push&med=m1&t=20%3A00&d=2026-10-06');
+    expect(todayPushHref(turn, 'abc')).toBe('/?source=push&med=m1&t=20%3A00&d=2026-10-06&n=abc');
     expect(todayPushHref(undefined, 'abc')).toBe('/?source=push');
     expect(nextOpenNonce()).not.toBe(nextOpenNonce());
   });

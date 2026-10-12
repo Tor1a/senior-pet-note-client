@@ -112,6 +112,15 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 모바일 이탈 확인은 넣지 않았다(화면이 쌓여 입력이 유지됨, 기획 Q8). `AppInput` 에 `inputRef` 추가.
 - 에뮬레이터에서 실제 화면은 확인하지 못했다(Metro 번들이 25%에서 멈춤). 실기기·TalkBack 확인 필요.
 
+## 알림에서 바로 체크 — 대체 흐름 (2026-10-12)
+기획 `.company/plans/알림-바로-체크.md`, 설계 `.company/design/알림-바로-체크.md` 6장(+맨 끝 "설계와 달라진 점"). **모바일 앱은 알림 버튼(Android 액션)을 만들지 않았다**(기획 Q1: 실기기·네이티브 모듈 검증 불가). 웹 서비스워커의 알림 버튼·토큰 사본(IndexedDB)은 웹 전용이며 모바일에는 해당 없다(토큰은 `expo-secure-store` 그대로). 모바일은 알림을 눌러 연 오늘 화면의 큰 [먹였어요] 흐름만 쓴다. iOS 도 같은 흐름이 유일한 경로다.
+- 알림 탭·인앱 배너 [오늘 화면에서 체크하기]는 `router.dismissTo('/?source=push&med=<약>&t=<시각>&d=<기록 날짜>&n=<열 때마다 바뀌는 값>')` 로 간다(`push/pushContext.todayPushHref`, 쿼리 조각은 공유 사본 `lib/reminderApi.medTargetQuery`).
+- **회차 매칭(공유 사본 `lib/todayDoses.decidePushHold`)**: 약·시각이 모두 맞는 회차 카드만 맨 위로 올리고 강조(테두리 + "방금 알림 온 약")하며 카드 아래에 폭 전체의 큰 [먹였어요]를 붙인다(라벨 "{약 이름} {용량} {시각} 먹였어요 체크"). 같은 약의 다른 회차에는 붙지 않는다. `d` 가 오늘 응답의 `recordDate` 와 다르면(어제 알림) 강조·큰 버튼·순서 변경이 없다. `t` 가 없는 옛 알림은 아직 안 먹인 첫 회차를 강조만 한다(큰 버튼 없음).
+- **고정**: 처음 정한 회차에 고정한다(렌더마다 같은 약의 "다음 안 먹인 회차"를 다시 고르지 않음). 체크하면 강조가 풀리고 줄이 접히며 큰 버튼도 사라지고 다음 회차로 옮겨 가지 않는다(되돌리면 다시 보임). 알림을 다시 열면(`n` 변경) 다시 고른다.
+- **레이아웃**: 2분 강조가 끝나도 큰 버튼은 남는다(카드 높이가 바뀌지 않게). 체크 직후 줄이 접힐 때까지(0.3초) 큰 버튼은 비활성으로 남고, 접힌 뒤 스크린리더 포커스는 [되돌리기]로 간다.
+- 문구는 공유 사본 `lib/pushActionText.ts`(+ 금지어 검사 테스트). 웹 원본을 먼저 고치고 복사한다(헤더 3줄 외 diff 없음, 테스트는 `vi` → `jest` 규칙).
+- 확인하지 못한 것: 에뮬레이터·실기기에서의 실제 화면, TalkBack/VoiceOver 읽기 순서(Jest 컴포넌트 테스트와 `expo export --platform web` 번들만 확인). 수동 확인: 개발 빌드에서 같은 약 2회차(08:00·20:00)를 만들고 20:00 알림을 탭해 20:00 카드에만 큰 버튼이 붙는지, 체크 후 08:00 에 붙지 않는지(실제 푸시 발송은 대표님 승인 필요).
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
@@ -130,7 +139,8 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 | loginForm.ts | 로그인/회원가입 입력 검증 | loginForm.test.ts (웹 테스트 사본) |
 | petApi.ts | 반려동물·약·오늘 API 계약 타입과 createPetApi | (타입·호출 경로는 화면 테스트로 확인) |
 | todayForm.ts | 오늘 입력 상태·검증·본문 변환·입력 보정(쉼표) | todayForm.test.ts (웹 테스트 사본) |
-| todayDoses.ts | 투약 카드 상태 전이·강조 선택·문구 | todayDoses.test.ts (웹 테스트 사본) |
+| todayDoses.ts | 투약 카드 상태 전이·알림이 가리킨 회차 고르기(`decidePushHold`)·문구 | todayDoses.test.ts (웹 테스트 사본) |
+| pushActionText.ts | 알림에서 바로 체크 문구·큰 버튼 라벨(금지어 검사) | pushActionText.test.ts (웹 테스트 사본) |
 | format.ts | 날짜·시각·체중·조사 표시 | format.test.ts (웹 테스트 사본) |
 | reminderApi.ts | 알림 규칙·기기 토큰 API 계약 타입과 createReminderApi | (화면 테스트로 확인) |
 | reminderForm.ts | 알림 설정 입력 상태↔PUT 본문, 검증, 요약·다음 알림·상태 줄 문구, `buildSaveBody`·`saveMessage`·`reminderStatusLabel` | reminderForm.test.ts · reminderForm.edge.test.ts (웹 테스트 사본) |
@@ -154,7 +164,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 2. 반려동물 등록·선택, 사진 업로드(`expo-image-picker`, MVP 결정 2).
 3. **푸시 알림(투약 알림):** `@react-native-firebase/messaging` 으로 구현됨. 알림 규칙(켜기/끄기·매일/요일/N일 간격·기간)은 앱의 약 관리 → 알림 설정 화면에서 정한다(웹과 같은 기능). 개발 빌드(`npx expo prebuild` + `npx expo run:android`)와 `google-services.json`(앱 루트, git 제외, 패키지명 `com.oraegyeot.seniorpet`)이 필요하다. Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 알림만 꺼진다. 플랫폼별로 따로 판단하며 한쪽 파일만 있으면 경고를 출력하고 그쪽만 켠다. **EAS 클라우드 빌드**는 git 에 없는 설정 파일이 올라가지 않으므로 file secret 으로 넣는다: `eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`(iOS 는 `GOOGLE_SERVICE_INFO_PLIST`). app.config.ts 가 이 환경변수 경로를 읽는다. iOS 는 `GoogleService-Info.plist` + APNs 키 + Apple 개발자 팀 필요(미검증).
 4. `packages/shared` 통합 (위 계획).
-5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 621개·52 스위트(2026-10-12 저장 되돌리기·QA 추가 후).
+5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 654개·54 스위트(2026-10-12 알림에서 바로 체크·QA 추가 후).
    jest 의 기본 글자 배율(fontScale)은 2 라서 평소 배치를 볼 때는 `testing/fontScale.ts` 의 `setFontScale(1)` 을 쓴다. expo-router·선택기는 `testing/mockRouter.ts`·`testing/mockDateTimePicker.tsx` 로 대체한다.
 6. 운영 API 는 반드시 `https://` 로. 정식(릴리스) 빌드의 안드로이드는 기본적으로 `http://` 통신을 막는다.
 
@@ -166,7 +176,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 
 ### 실기기에서 확인할 것 (알림)
 - 웹: 서비스워커가 설치되는 중(첫 방문 직후)에 [알림 받기]를 눌렀을 때 토큰 발급이 되는지(코드는 활성화를 최대 10초 기다림)
-- 알림 탭 시 `?source=push&med=<id>` 로 열려 카드가 강조되는지, 오늘 화면이 이미 열려 있을 때 배너 버튼 동작
+- 알림 탭 시 `?source=push&med=<id>&t=<시각>&d=<기록 날짜>` 로 열려 그 회차 카드만 강조되고 큰 [먹였어요]가 붙는지, 오늘 화면이 이미 열려 있을 때 배너 버튼 동작
 - 알림 배너가 노치·상태바 아래에 놓이는지(안전 영역 반영). 배너가 뜨면 화면 프레임이 상단 인셋을 빼므로(`screenEdges`) 노치 여백이 두 번 생기지 않는지
 - 알림 탭 강조: Expo Go 에서는 `xcrun simctl openurl booted "exp://127.0.0.1:8081/--/?source=push&med=<약 id>"` 로 흉내 낼 수 있다(미검증 형식)
 - 점선 테두리(제안값)가 iOS 둥근 모서리에서 깨지지 않는지, `decimal-pad` 쉼표 입력, 숫자 키패드 닫기
