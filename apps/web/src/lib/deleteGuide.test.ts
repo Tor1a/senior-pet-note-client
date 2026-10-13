@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { DELETE_GUIDE_TEXT, deleteGuideTexts, isValidSupportEmail, resolveDeleteGuide } from './deleteGuide';
 import { findPrivacyForbidden } from './privacyText';
+import { findRoutineForbidden } from './routineText';
 
 describe('계정 삭제 안내 문구·환경변수', () => {
+  it('삭제 범위에 산책·배변 횟수가 들어 있고 루틴 금지 표현 검사도 통과한다', () => {
+    expect(DELETE_GUIDE_TEXT.dataItems).toContain('일일 기록(체중·식사·물·증상·메모, 산책·배변 횟수)');
+    for (const text of deleteGuideTexts()) expect({ text, hit: findRoutineForbidden(text) }).toEqual({ text, hit: null });
+  });
+
   it('고정 문구에 금지 표현과 "확인 필요" 같은 미정 표시가 없다', () => {
     for (const text of deleteGuideTexts()) {
       expect(findPrivacyForbidden(text)).toBeNull();

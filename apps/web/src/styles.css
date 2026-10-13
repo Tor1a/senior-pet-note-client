@@ -370,3 +370,22 @@ input[type='date'] { min-height: 3rem; font-size: 1.1rem; }
 .todo-collapsed .error { flex-basis: 100%; }
 .todo-page .card { display: flex; flex-direction: column; gap: 0.5rem; }
 .device-line p { margin: 0; }
+
+/* 산책·배변 기록 (선택): 설계 design/루틴-기록-칩.md 3장. 새 색 없음, 빨강 없음 */
+.routine-toggle { width: 100%; min-height: 3.5rem; background: #fff; color: var(--text); border: 2px solid #b8aa9c; font-weight: 700; text-align: left; display: flex; flex-direction: column; align-items: stretch; gap: 0.25rem; padding: 0.5rem 0.75rem; touch-action: manipulation; }
+.routine-toggle-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.75rem; }
+.routine-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; font-weight: 400; color: var(--sub); font-size: 1rem; }
+.routine-chip { display: inline-block; font-size: 0.875rem; font-weight: 700; color: var(--text); border: 2px solid #b8aa9c; border-radius: 999px; padding: 0 0.5rem; }
+.routine-body { display: flex; flex-direction: column; gap: 0.75rem; }
+.routine-body[hidden] { display: none; }
+.routine-body p { margin: 0; }
+.routine-item { display: flex; flex-direction: column; gap: 0.5rem; }
+.routine-label { font-weight: 700; }
+.routine-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+.routine-step { width: 3.5rem; min-height: 3.5rem; font-size: 1.5rem; background: #fff; border: 2px solid var(--sub); color: var(--text); touch-action: manipulation; user-select: none; }
+.routine-value { flex: 1 1 5rem; min-width: 5rem; min-height: 3.5rem; display: flex; align-items: center; justify-content: center; text-align: center; background: #fff; font-size: 1.2rem; user-select: none; }
+.routine-value.is-none { border: 2px solid #b8aa9c; color: var(--sub); font-weight: 400; }
+.routine-value.is-set { border: 3px solid var(--text); color: var(--text); font-weight: 700; }
+.routine-clear { min-height: 3rem; min-width: 4rem; }
+.routine .routine-step[aria-disabled="true"], .routine .routine-clear[aria-disabled="true"] { opacity: 0.5; }
+.routine-dirty { font-weight: 700; }

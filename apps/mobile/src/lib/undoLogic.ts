@@ -1,4 +1,4 @@
-// [공유 로직 사본] 원본: web/src/lib/undoLogic.ts (2026-10-12 복사)
+// [공유 로직 사본] 원본: web/src/lib/undoLogic.ts (2026-10-13 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
 // 저장 되돌리기·실수 방지의 순수 로직 (네트워크·타이머·화면 상태는 화면에 남긴다)
@@ -33,7 +33,7 @@ export type DailyUndoPlan =
   /** 기록 날짜가 넘어갔다 → 되돌릴 수 없다 */
   | { kind: 'expired' };
 
-/** 복원할 PUT 본문(8개 필드). id·날짜·updatedAt 은 보내지 않는다 */
+/** 복원할 PUT 본문(8개 필드 + 루틴 2개 = 10개). id·날짜·updatedAt 은 보내지 않는다. 저장 전 루틴이 없으면 null 을 명시해 지운다 */
 export function restoreBody(before: DailyLog): DailyLogBody {
   return {
     foodLevel: before.foodLevel,
@@ -44,6 +44,8 @@ export function restoreBody(before: DailyLog): DailyLogBody {
     symptomsNone: before.symptomsNone,
     symptomOther: before.symptomOther,
     memo: before.memo,
+    walkCount: before.walkCount ?? null,
+    poopCount: before.poopCount ?? null,
   };
 }
 

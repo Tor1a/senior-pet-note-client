@@ -31,10 +31,10 @@ function today(dailyLog: DailyLog | null, recordDate = '2026-10-12'): TodayRespo
 }
 
 describe('restoreBody', () => {
-  it('id·날짜·updatedAt 없이 8개 필드만 돌려주고 증상 배열은 복사한다', () => {
+  it('id·날짜·updatedAt 없이 10개 필드(기존 8 + 루틴 2)만 돌려주고 증상 배열은 복사한다', () => {
     const body = restoreBody(LOG);
     expect(Object.keys(body).sort()).toEqual(
-      ['foodLevel', 'memo', 'symptomOther', 'symptoms', 'symptomsNone', 'waterLevel', 'waterMl', 'weightKg'].sort(),
+      ['foodLevel', 'memo', 'symptomOther', 'symptoms', 'symptomsNone', 'waterLevel', 'waterMl', 'weightKg', 'walkCount', 'poopCount'].sort(),
     );
     expect(body.symptoms).toEqual(['cough']);
     expect(body.symptoms).not.toBe(LOG.symptoms);

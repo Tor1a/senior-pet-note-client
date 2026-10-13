@@ -10,6 +10,8 @@ import {
   type LevelCounts,
 } from './historyStats';
 import type { DailyLog, HistoryDay } from './petApi';
+import { toRoutineValue } from './routineForm';
+import { routineSummary } from './routineText';
 import { SYMPTOM_LABELS, SYMPTOM_NONE_LABEL } from './symptoms';
 
 export const HISTORY_TEXT = {
@@ -178,7 +180,11 @@ export function dayRowSummary(day: HistoryDay): string {
   else if (log.waterLevel !== null) parts.push(`물 ${LEVEL_LABELS[log.waterLevel]}`);
   if (log.symptoms.length > 0) parts.push(`◆ 증상 ${log.symptoms.length}개`);
   if (medPart) parts.push(medPart);
-  return parts.length > 0 ? parts.join(' · ') : HISTORY_TEXT.noRecord;
+  if (parts.length === 0) {
+    // 루틴(산책·배변 횟수)만 저장한 날은 "기록 없음"이 아니다. 사실 문구만 보인다
+    return routineSummary(toRoutineValue(log.walkCount), toRoutineValue(log.poopCount)) ?? HISTORY_TEXT.noRecord;
+  }
+  return parts.join(' · ');
 }
 
 /** 하루 상세의 항목 값 (안 적은 항목은 "적지 않았어요") */

@@ -1,4 +1,4 @@
-// [공유 로직 사본] 원본: web/src/lib/petApi.ts (2026-10-08 복사)
+// [공유 로직 사본] 원본: web/src/lib/petApi.ts (2026-10-13 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
 // 반려동물·투약·"오늘" 화면 API (계약: projects/senior-pet-note/docs/api-today.md v1)
@@ -63,6 +63,12 @@ export interface DailyLogBody {
   symptomsNone: boolean;
   symptomOther: string | null;
   memo: string;
+  /**
+   * 루틴 기록(산책·배변 횟수, 계약 docs/api-routine.md): 0~20 정수, null = 안 적음.
+   * PUT 요청에서 생략하면 서버가 기존 값을 유지하고, null 을 보내면 지운다. 응답에 없으면(구버전 서버) null 로 읽는다.
+   */
+  walkCount?: number | null;
+  poopCount?: number | null;
 }
 
 export interface DailyLog extends DailyLogBody {

@@ -11,6 +11,8 @@ import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '
 import { DISCLAIMER } from '../lib/constants';
 import { daysBetween, formatRecordDate, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
+import { hasRoutineValue, isRoutineDirty, routineFromLog, undoRoutineNote } from '../lib/routineForm';
+import { undoRoutineSentence } from '../lib/routineText';
 import { toggleSymptom, toggleSymptomNone } from '../lib/symptoms';
 import {
   applyCheckResult,
@@ -76,6 +78,7 @@ import { DeviceFooter } from './sections/DeviceFooter';
 import { DoseSection } from './sections/DoseSection';
 import { LevelPicker } from './sections/LevelPicker';
 import { MemoSection } from './sections/MemoSection';
+import { RoutineSection } from './sections/RoutineSection';
 import { SaveBar } from './sections/SaveBar';
 import { SymptomSection } from './sections/SymptomSection';
 import { TodayHeader } from './sections/TodayHeader';
@@ -118,6 +121,9 @@ export default function TodayScreen() {
   const [savedLog, setSavedLog] = useState<DailyLog | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  // 산책·배변 기록 칸의 펼침(저장하지 않는다). 불러온 직후 저장된 값이 있을 때만 한 번 펼친다
+  const [routineOpen, setRoutineOpen] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const [dailyNotice, setDailyNotice] = useState<DailyNotice | null>(null);
   const [doseNotice, setDoseNotice] = useState<{ message: string; recheckKey: string | null } | null>(null);
   const [focusTarget, setFocusTarget] = useState<{ key: string; to: 'undo' | 'card' } | null>(null);
@@ -176,6 +182,7 @@ export default function TodayScreen() {
     setDoses(toDoseViews(t.doses));
     setSavedLog(t.dailyLog);
     setForm(initialTodayForm(t, preferMl));
+    setRoutineOpen(hasRoutineValue(routineFromLog(t.dailyLog)));
     // 날짜·반려동물이 바뀌면 "그대로 저장" 확인값도 새로 시작한다
     setConfirmedWeight(null);
   }, []);
@@ -257,6 +264,7 @@ export default function TodayScreen() {
             setDoseNotice(null);
             setWeightAsk(null);
             setSaveError(null);
+            setSaveFailed(false);
             setDoseMessage(null);
           }
         } catch (err) {
@@ -444,6 +452,7 @@ export default function TodayScreen() {
     if (!form || !today || !petId || saving || dailyNotice?.kind === 'busy') return;
     const problem = validateTodayForm(form);
     setSaveError(problem);
+    setSaveFailed(false);
     if (problem) return;
     // 체중 자릿수 확인: 지난 기록의 5배 이상·1/5 이하면 저장 전에 숫자 두 개를 나란히 보여 주고 묻는다
     const check = checkWeightDigits({
@@ -467,7 +476,7 @@ export default function TodayScreen() {
       const server = await petApi.getToday(petId).catch(() => null);
       const before = server && server.recordDate === today.recordDate ? server.dailyLog : savedLog;
       const wasFirst = isFirstUse(today) && !savedLog && !before;
-      const log = await petApi.saveDailyLog(petId, today.recordDate, buildDailyLogBody(form));
+      const log = await petApi.saveDailyLog(petId, today.recordDate, buildDailyLogBody(form, routineFromLog(today.dailyLog)));
       // 저장하는 동안 앱 복귀 등으로 화면이 새 날짜로 바뀌었으면 구 날짜 값을 되살리지 않는다
       if (todayRef.current?.recordDate !== today.recordDate) return;
       const next = { ...today, dailyLog: log };
@@ -490,11 +499,13 @@ export default function TodayScreen() {
       if (err instanceof ApiError && err.code === 'INVALID_RECORD_DATE') {
         // 새벽 4시가 지나 기록 날짜가 바뀜 → 새 날짜로 다시 불러온다
         setSaveError(toUserMessage(err, 'dailyLog'));
+        setSaveFailed(true);
         void load();
         return;
       }
       if (err instanceof ApiError && err.status === 401) return;
       setSaveError(toUserMessage(err, 'dailyLog'));
+      setSaveFailed(true);
     } finally {
       setSaving(false);
     }
@@ -544,7 +555,10 @@ export default function TodayScreen() {
       setToday(next);
       setSavedLog(restored);
       refreshFormUnlessEdited(next, preferMl);
-      finish(plan.kind === 'put' ? UNDO_TEXT.dailyRestored : UNDO_TEXT.dailyRemoved, 'ok');
+      // 루틴 값이 저장 전과 달라졌을 때만 결과 안내 뒤에 한 문장을 덧붙인다(그 밖에는 기존 문구 그대로)
+      const routineSentence = undoRoutineSentence(undoRoutineNote(undo.before, undo.saved, plan.kind === 'put'));
+      const base = plan.kind === 'put' ? UNDO_TEXT.dailyRestored : UNDO_TEXT.dailyRemoved;
+      finish(routineSentence ? `${base} ${routineSentence}` : base, 'ok');
     } catch (err) {
       const kind = classifyUndoError(err);
       if (kind === 'auth') return;
@@ -797,6 +811,19 @@ export default function TodayScreen() {
             </WeightSection>
 
             <MemoSection value={form.memo} onChange={(memo) => update({ memo })} />
+
+            <RoutineSection
+              routine={form.routine}
+              open={routineOpen}
+              onToggle={() => setRoutineOpen((v) => !v)}
+              onChange={(routine) => {
+                setSaveFailed(false); // 실패 뒤 다시 고치면 "저장하지 못했어요"를 걷는다(저장하면 다시 판단)
+                update({ routine });
+              }}
+              dirty={isRoutineDirty(form.routine, routineFromLog(today.dailyLog))}
+              saveFailed={saveFailed}
+              saving={saving}
+            />
 
             <Card>
               <AppText variant="title" accessibilityRole="header">

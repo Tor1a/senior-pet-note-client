@@ -86,6 +86,10 @@ describe('문구 조립', () => {
     const noMed = daysFixture(END, 1, { [END]: { weightKg: 4 } })[0];
     expect(dayRowSummary(noMed)).toBe('체중 4kg');
     expect(dayRowSummary(daysFixture(END, 1, { [END]: { memo: '메모만' } })[0])).toBe('기록 없음');
+    // 루틴만 저장한 날은 "기록 없음"이 아니다(사실 문구만). 메모와 같이 있어도 루틴 문구, 다른 항목이 있으면 줄은 그대로
+    expect(dayRowSummary(daysFixture(END, 1, { [END]: { walkCount: 2, poopCount: 0 } })[0])).toBe('산책 2회 · 배변 0회');
+    expect(dayRowSummary(daysFixture(END, 1, { [END]: { poopCount: 1, memo: '메모' } })[0])).toBe('배변 1회');
+    expect(dayRowSummary(daysFixture(END, 1, { [END]: { weightKg: 4, walkCount: 2 } })[0])).toBe('체중 4kg');
   });
 
   it('하루 상세 값: 안 적은 항목은 "적지 않았어요"', () => {

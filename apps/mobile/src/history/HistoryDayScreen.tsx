@@ -11,6 +11,8 @@ import { addDays, formatRecordDate } from '../lib/format';
 import { isValidRecordDate } from '../lib/historyStats';
 import { dayDetailValues, HISTORY_TEXT as T, medicationText } from '../lib/historyText';
 import type { HistoryDay } from '../lib/petApi';
+import { toRoutineValue } from '../lib/routineForm';
+import { ROUTINE_TEXT, routineSummary } from '../lib/routineText';
 import { goBackOr } from '../medications/routes';
 import { ScreenTop } from '../medications/ScreenTop';
 import { usePet } from '../pet/PetProvider';
@@ -83,6 +85,7 @@ function DayView({ recordDate }: { recordDate: string }) {
 
   const log = day?.dailyLog ?? null;
   const values = dayDetailValues(log);
+  const routine = log ? routineSummary(toRoutineValue(log.walkCount), toRoutineValue(log.poopCount)) : null;
   const isToday = serverToday !== null && recordDate === serverToday;
   const canNext = serverToday !== null && recordDate < serverToday;
   const med = day?.medication;
@@ -145,6 +148,7 @@ function DayView({ recordDate }: { recordDate: string }) {
               <Field label="식사" value={values.food} />
               <Field label="물" value={values.water} />
               <Field label="증상" value={values.symptom} />
+              {routine ? <Field label={ROUTINE_TEXT.historyLabel} value={routine} /> : null}
               {log.memo ? <Field label="메모" value={log.memo} selectable /> : null}
             </Card>
           ) : (

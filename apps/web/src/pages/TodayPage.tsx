@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { Link, useNavigate, useSearchParams, type LinkProps } from 'react-router-dom';
 import ConfirmCard from '../components/ConfirmCard';
 import PetAvatar from '../components/PetAvatar';
+import RoutineSection from '../components/RoutineSection';
 import UndoNotice from '../components/UndoNotice';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
@@ -10,6 +11,8 @@ import { PRIVACY_TEXT } from '../lib/privacyText';
 import { HISTORY_TEXT } from '../lib/historyText';
 import { bigDoseButtonLabel, PUSH_ACTION_TEXT } from '../lib/pushActionText';
 import { REPORT_TEXT } from '../lib/reportText';
+import { hasRoutineValue, isRoutineDirty, routineFromLog, undoRoutineNote } from '../lib/routineForm';
+import { undoRoutineSentence } from '../lib/routineText';
 import { TODO_TEXT } from '../lib/todoText';
 import { daysBetween, formatKg, formatRecordDate, LEVEL_LABELS, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
@@ -168,6 +171,9 @@ export default function TodayPage() {
   const [leaveTo, setLeaveTo] = useState<{ to: string; from: HTMLElement | null } | null>(null);
   const [shifting, setShifting] = useState(false);
   const [memoOpen, setMemoOpen] = useState(false);
+  // 산책·배변 기록 칸의 펼침(저장하지 않는다). 불러온 직후 저장된 값이 있을 때만 한 번 펼친다
+  const [routineOpen, setRoutineOpen] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
   const navigate = useNavigate();
   const compact = useCompactHeight();
   const weightInputRef = useRef<HTMLInputElement>(null);
@@ -217,6 +223,7 @@ export default function TodayPage() {
     setDoses(toDoseViews(t.doses));
     setSavedLog(t.dailyLog);
     setForm(initialTodayForm(t, readPreferMl()));
+    setRoutineOpen(hasRoutineValue(routineFromLog(t.dailyLog)));
     // 날짜·반려동물이 바뀌면 "그대로 저장" 확인값도 새로 시작한다
     setConfirmedWeight(null);
   }, []);
@@ -436,6 +443,7 @@ export default function TodayPage() {
     if (!form || !today || !petId || saving || dailyNotice?.kind === 'busy') return;
     const problem = validateTodayForm(form);
     setSaveError(problem);
+    setSaveFailed(false);
     if (problem) return;
     // 체중 자릿수 확인: 지난 기록의 5배 이상·1/5 이하면 저장 전에 숫자 두 개를 나란히 보여 주고 묻는다
     const check = checkWeightDigits({
@@ -458,7 +466,7 @@ export default function TodayPage() {
       const server = await petApi.getToday(petId).catch(() => null);
       const before = server && server.recordDate === today.recordDate ? server.dailyLog : savedLog;
       const wasFirst = isFirstUse(today) && !savedLog && !before;
-      const log = await petApi.saveDailyLog(petId, today.recordDate, buildDailyLogBody(form));
+      const log = await petApi.saveDailyLog(petId, today.recordDate, buildDailyLogBody(form, routineFromLog(today.dailyLog)));
       const next = { ...today, dailyLog: log };
       setToday(next);
       setSavedLog(log);
@@ -479,11 +487,13 @@ export default function TodayPage() {
       if (err instanceof ApiError && err.code === 'INVALID_RECORD_DATE') {
         // 새벽 4시가 지나 기록 날짜가 바뀜 → 새 날짜로 다시 불러온다
         setSaveError(toUserMessage(err, 'dailyLog'));
+        setSaveFailed(true);
         void load();
         return;
       }
       if (err instanceof ApiError && err.status === 401) return;
       setSaveError(toUserMessage(err, 'dailyLog'));
+      setSaveFailed(true);
     } finally {
       setSaving(false);
     }
@@ -531,7 +541,10 @@ export default function TodayPage() {
       setToday(next);
       setSavedLog(restored);
       refreshFormUnlessEdited(next);
-      finish(plan.kind === 'put' ? UNDO_TEXT.dailyRestored : UNDO_TEXT.dailyRemoved, 'ok');
+      // 루틴 값이 저장 전과 달라졌을 때만 결과 안내 뒤에 한 문장을 덧붙인다(그 밖에는 기존 문구 그대로)
+      const routineSentence = undoRoutineSentence(undoRoutineNote(undo.before, undo.saved, plan.kind === 'put'));
+      const base = plan.kind === 'put' ? UNDO_TEXT.dailyRestored : UNDO_TEXT.dailyRemoved;
+      finish(routineSentence ? `${base} ${routineSentence}` : base, 'ok');
     } catch (err) {
       const kind = classifyUndoError(err);
       if (kind === 'auth') return;
@@ -945,6 +958,19 @@ export default function TodayPage() {
                   {form.memo.length} / {MEMO_MAX_LENGTH}
                 </p>
               </section>
+
+              <RoutineSection
+                routine={form.routine}
+                open={routineOpen}
+                onToggle={() => setRoutineOpen((v) => !v)}
+                onChange={(routine) => {
+                  setSaveFailed(false); // 실패 뒤 다시 고치면 "저장하지 못했어요"를 걷는다(저장하면 다시 판단)
+                  changeForm({ ...form, routine });
+                }}
+                dirty={!!baseline && isRoutineDirty(form.routine, baseline.routine)}
+                saveFailed={saveFailed}
+                saving={saving}
+              />
 
               <GuardLink guard={guardLeave} to="/history" className="history-link-row">
                 <span>{HISTORY_TEXT.entryLink}</span>

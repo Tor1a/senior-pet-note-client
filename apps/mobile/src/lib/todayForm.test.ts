@@ -27,7 +27,7 @@ describe('오늘 화면 입력 상태', () => {
     const f = initialTodayForm(TODAY);
     expect(f.food).toEqual({ value: 2, source: 'suggested' });
     expect(f.weight).toEqual({ text: '4.35', measured: false, suggested: true });
-    expect(buildDailyLogBody(f).weightKg).toBeNull();
+    expect(buildDailyLogBody(f, f.routine).weightKg).toBeNull();
   });
 
   it('3단 버튼: 제안값을 누르면 확정, 확정값을 다시 누르면 해제', () => {
@@ -39,7 +39,7 @@ describe('오늘 화면 입력 상태', () => {
 
   it('물 ml 모드면 waterLevel 은 null 로 보낸다', () => {
     const f = { ...initialTodayForm(TODAY), waterMode: 'ml' as const, waterMl: { text: '350', source: 'confirmed' as const } };
-    expect(buildDailyLogBody(f)).toMatchObject({ waterLevel: null, waterMl: 350 });
+    expect(buildDailyLogBody(f, f.routine)).toMatchObject({ waterLevel: null, waterMl: 350 });
   });
 
   it('체중 스테퍼와 범위 검사', () => {

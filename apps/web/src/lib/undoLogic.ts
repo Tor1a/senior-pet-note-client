@@ -30,7 +30,7 @@ export type DailyUndoPlan =
   /** 기록 날짜가 넘어갔다 → 되돌릴 수 없다 */
   | { kind: 'expired' };
 
-/** 복원할 PUT 본문(8개 필드). id·날짜·updatedAt 은 보내지 않는다 */
+/** 복원할 PUT 본문(8개 필드 + 루틴 2개 = 10개). id·날짜·updatedAt 은 보내지 않는다. 저장 전 루틴이 없으면 null 을 명시해 지운다 */
 export function restoreBody(before: DailyLog): DailyLogBody {
   return {
     foodLevel: before.foodLevel,
@@ -41,6 +41,8 @@ export function restoreBody(before: DailyLog): DailyLogBody {
     symptomsNone: before.symptomsNone,
     symptomOther: before.symptomOther,
     memo: before.memo,
+    walkCount: before.walkCount ?? null,
+    poopCount: before.poopCount ?? null,
   };
 }
 

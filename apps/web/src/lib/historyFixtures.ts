@@ -15,6 +15,8 @@ export function logFixture(recordDate: string, overrides: Partial<DailyLog> = {}
     symptomsNone: false,
     symptomOther: null,
     memo: '',
+    walkCount: null,
+    poopCount: null,
     updatedAt: `${recordDate}T13:20:00Z`,
     ...overrides,
   };

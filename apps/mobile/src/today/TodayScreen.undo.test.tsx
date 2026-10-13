@@ -117,7 +117,7 @@ describe('일일 기록 저장 되돌리기', () => {
     const putCalls = calls.filter((c) => c.method === 'PUT');
     expect(putCalls).toHaveLength(2);
     expect(putCalls[1].body).toEqual({
-      foodLevel: 1, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: '처음 메모',
+      foodLevel: 1, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: '처음 메모', walkCount: null, poopCount: null,
     });
   });
 
@@ -233,7 +233,7 @@ describe('일일 기록 저장 되돌리기 - 두 기기 경쟁', () => {
     const putCalls = calls.filter((c) => c.method === 'PUT');
     expect(putCalls).toHaveLength(2);
     expect(putCalls[1].body).toEqual({
-      foodLevel: 1, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: 'A 기기',
+      foodLevel: 1, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: 'A 기기', walkCount: null, poopCount: null,
     });
     expect(screen.getByLabelText('메모 (선택)').props.value).toBe('A 기기');
   });

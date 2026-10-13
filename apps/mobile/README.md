@@ -149,6 +149,18 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 계정 탈퇴 화면 삭제 목록에 `직접 적은 할 일 일정(제목·일정 메모·병원 메모)과 알림 발송 기록` 추가(웹 `AccountDeletePage` 와 같은 문구).
 - 실기기에서 확인하지 못함: 날짜·시각 선택기, VoiceOver/TalkBack 낭독, 글자 200% 모양, 알림 도착과 탭 이동(콜드 스타트 포함), 포그라운드 배너 위치. jest(RNTL)로만 확인.
 
+## 루틴 기록 칩 — 산책·배변 횟수 (2026-10-13, 커밋 전)
+기획 `.company/plans/루틴-기록-칩.md`(M1~M2), 설계 `.company/design/루틴-기록-칩.md`, 계약 백엔드 `docs/api-routine.md`. 웹과 같은 기능이고 **새 네이티브 모듈이 없다(개발 빌드 재생성 불필요, `package.json` 변경 없음).**
+- 화면: `src/today/sections/RoutineSection.tsx`(오늘 화면 `MemoSection` 다음·리포트 카드 앞). 접힌 행 `산책·배변 기록 (선택)`(기본 접힘, 불러온 직후 저장된 값이 있으면 한 번 자동 펼침, 펼침 상태는 저장하지 않음), 항목별 [−] 값 [+] [지우기](키보드 입력 없음, 안 적음 -> [+] 는 1회, 1 -> 0, 0 유지, 20 상한). 별도 저장 버튼 없이 기존 [저장] 하나로 함께 저장하고, 루틴 값이 불러온(저장한) 시점과 달라졌을 때만 `walkCount`·`poopCount` 두 키를 함께 보내고(지우면 null 명시), 안 바꿨으면 두 키를 생략한다(8필드. 서버는 생략 = 기존 값 유지라 다른 기기의 값을 지우지 않는다). 지난 기록 목록 줄은 루틴만 저장한 날 `산책 2회 · 배변 3회` 로 보인다.
+- 저장 전 표시: 바꾼 값이 있으면 `저장 전` 칩과 안내 한 줄(접힌 행에도 요약 옆에 칩). 저장 실패 시 안내가 `저장하지 못했어요. …` 로 바뀌고 값은 그대로 두며, 루틴 값을 다시 고치면 `저장 전` 안내로 돌아온다. `TodayScreen` 의 `update()` 를 지나므로 기존 규칙대로 저장 되돌리기 안내가 정리되고, 접고 펴기는 안내를 정리하지 않는다.
+- 저장 되돌리기: `restoreBody` 가 10필드(저장 전 루틴이 없으면 null 명시). 루틴 값이 저장 전과 달라졌을 때만 결과 안내 뒤에 한 문장(`산책·배변 기록도 저장 전 내용으로 돌아갔어요.` / 행 삭제 시 `… 함께 지워졌어요.`)을 덧붙인다. 같으면 기존 문구 그대로.
+- 큰 글씨: `fontScale` 1.3 이상(`isLargeFont`)에서 값 칸 전체 폭 -> [−][+] 가로 2개 -> [지우기] 전체 폭으로 세로 배치.
+- 낭독: 버튼 라벨 고정(`산책 횟수 줄이기/늘리기/지우기`) + `accessibilityValue`(현재 값), 값 변경은 마지막 입력 후 0.5초 모아 한 번(iOS `announceForAccessibility`, Android `accessibilityLiveRegion`).
+- 지난 기록 하루 상세(`HistoryDayScreen`): 증상 다음·메모 앞에 `산책·배변` 한 줄(`산책 2회 · 배변 3회`, 둘 다 없으면 줄 숨김). 목록·그래프·리포트에는 넣지 않았다.
+- 공유 사본: `routineForm/routineText`(+테스트, 웹 원본과 헤더 외 동일), 수정 사본 `petApi/todayForm/undoLogic/historyFixtures`. 금지어 검사 `findRoutineForbidden()`. 일반 저장 경로의 요청 본문 기대는 루틴을 안 바꾸면 8필드(두 키 생략), 바꾸면 10필드(시나리오 판정 불변; 되돌리기 `restoreBody` 는 10필드 그대로). 계정 탈퇴 화면 삭제 목록 문구에 `산책·배변 횟수` 추가(웹과 같은 문구).
+- 설계와 달라진 점: 제목에 헤더 역할(`accessibilityRole="header"`)을 따로 두지 않았다(토글 버튼 안에 제목이 있어 버튼 하나로 읽힘). 값 칸 `adjustable` 동작(VoiceOver 증감)은 후속(설계상 선택).
+- 테스트 결과(2026-10-13): 82스위트 999개 통과(기준선 77/948). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독, Android liveRegion)와 실제 서버 연동은 확인하지 못했다. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.

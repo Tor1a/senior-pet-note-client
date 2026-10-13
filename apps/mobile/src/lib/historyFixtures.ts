@@ -1,4 +1,4 @@
-// [공유 로직 사본] 원본: web/src/lib/historyFixtures.ts (2026-10-08 복사)
+// [공유 로직 사본] 원본: web/src/lib/historyFixtures.ts (2026-10-13 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
 // 지난 기록 테스트용 가짜 데이터 (계약 예시 docs/api-history.md 와 같은 모양)
@@ -18,6 +18,8 @@ export function logFixture(recordDate: string, overrides: Partial<DailyLog> = {}
     symptomsNone: false,
     symptomOther: null,
     memo: '',
+    walkCount: null,
+    poopCount: null,
     updatedAt: `${recordDate}T13:20:00Z`,
     ...overrides,
   };

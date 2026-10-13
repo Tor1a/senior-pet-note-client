@@ -141,7 +141,7 @@ describe('일일 기록 저장 되돌리기', () => {
     const puts2 = calls.filter((c) => c.method === 'PUT');
     expect(puts2).toHaveLength(2);
     expect(puts2[1].body).toEqual({
-      foodLevel: 1, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: '처음 메모',
+      foodLevel: 1, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: '처음 메모', walkCount: null, poopCount: null,
     });
     expect(foodRadio('조금').getAttribute('aria-checked')).toBe('true');
   });
@@ -227,6 +227,7 @@ describe('일일 기록 저장 되돌리기 - 두 기기 경쟁', () => {
   const bodyOf = (l: DailyLog) => ({
     foodLevel: l.foodLevel, waterLevel: l.waterLevel, waterMl: l.waterMl, weightKg: l.weightKg,
     symptoms: l.symptoms, symptomsNone: l.symptomsNone, symptomOther: l.symptomOther, memo: l.memo,
+    walkCount: l.walkCount ?? null, poopCount: l.poopCount ?? null,
   });
 
   it('A·B 가 모두 "기록 없음"으로 열고 A 가 먼저 저장한 뒤 B 가 저장해도, B 의 되돌리기는 A 의 기록을 지우지 않고 A 의 기록으로 복원한다', async () => {

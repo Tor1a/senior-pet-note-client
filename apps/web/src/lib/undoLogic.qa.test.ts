@@ -33,8 +33,9 @@ describe('restoreBody: 증상·메모·체중 null/빈 값 조합', () => {
       expect(body).toEqual({
         foodLevel: log.foodLevel, waterLevel: log.waterLevel, waterMl: log.waterMl, weightKg: log.weightKg,
         symptoms: log.symptoms, symptomsNone: log.symptomsNone, symptomOther: log.symptomOther, memo: log.memo,
+        walkCount: log.walkCount ?? null, poopCount: log.poopCount ?? null,
       });
-      expect(Object.keys(body)).toHaveLength(8);
+      expect(Object.keys(body)).toHaveLength(10);
       // null 이 undefined/빈 문자열로 바뀌지 않는다(JSON 으로 보내면 서버가 null 로 받는다)
       expect(JSON.parse(JSON.stringify(body))).toEqual(JSON.parse(JSON.stringify(log.memo === null ? { ...body, memo: null } : body)));
     });

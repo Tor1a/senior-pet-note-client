@@ -60,6 +60,12 @@ export interface DailyLogBody {
   symptomsNone: boolean;
   symptomOther: string | null;
   memo: string;
+  /**
+   * 루틴 기록(산책·배변 횟수, 계약 docs/api-routine.md): 0~20 정수, null = 안 적음.
+   * PUT 요청에서 생략하면 서버가 기존 값을 유지하고, null 을 보내면 지운다. 응답에 없으면(구버전 서버) null 로 읽는다.
+   */
+  walkCount?: number | null;
+  poopCount?: number | null;
 }
 
 export interface DailyLog extends DailyLogBody {

@@ -7,6 +7,8 @@ import { addDays, formatRecordDate } from '../lib/format';
 import { isValidRecordDate } from '../lib/historyStats';
 import { dayDetailValues, HISTORY_TEXT as T, medicationText } from '../lib/historyText';
 import type { HistoryDay } from '../lib/petApi';
+import { toRoutineValue } from '../lib/routineForm';
+import { ROUTINE_TEXT, routineSummary } from '../lib/routineText';
 import { usePet } from '../pet';
 
 // H2 하루 상세(읽기 전용): GET daily-logs?from=D&to=D. 새로고침·딥링크에도 안전하다.
@@ -58,6 +60,7 @@ function DayView({ recordDate }: { recordDate: string }) {
 
   const values = dayDetailValues(day?.dailyLog ?? null);
   const log = day?.dailyLog ?? null;
+  const routine = log ? routineSummary(toRoutineValue(log.walkCount), toRoutineValue(log.poopCount)) : null;
   const isToday = serverToday !== null && recordDate === serverToday;
   const canNext = serverToday !== null && recordDate < serverToday;
   const med = day?.medication;
@@ -120,6 +123,12 @@ function DayView({ recordDate }: { recordDate: string }) {
                 <dd>{values.water}</dd>
                 <dt>증상</dt>
                 <dd>{values.symptom}</dd>
+                {routine && (
+                  <>
+                    <dt>{ROUTINE_TEXT.historyLabel}</dt>
+                    <dd>{routine}</dd>
+                  </>
+                )}
                 {log.memo && (
                   <>
                     <dt>메모</dt>

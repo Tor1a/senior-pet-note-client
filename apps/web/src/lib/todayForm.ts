@@ -7,6 +7,7 @@
 import { MEMO_MAX_LENGTH } from './constants';
 import { formatKg } from './format';
 import type { DailyLogBody, TodayResponse } from './petApi';
+import { EMPTY_ROUTINE, isRoutineDirty, routineFromLog, type RoutineState } from './routineForm';
 import {
   INITIAL_SYMPTOM_STATE,
   symptomStateFromLog,
@@ -31,6 +32,8 @@ export interface TodayForm {
   weight: { text: string; measured: boolean; suggested: boolean };
   symptoms: SymptomState;
   memo: string;
+  /** 루틴 기록(산책·배변 횟수). 제안값 없음: 저장된 값이 없으면 안 적음 */
+  routine: RoutineState;
 }
 
 function fromSaved(value: number | null): LevelField {
@@ -61,6 +64,7 @@ export function initialTodayForm(today: TodayResponse, preferMl = false): TodayF
           : weightFromReference(s.weightKg, lastWeight?.weightKg ?? null),
       symptoms: symptomStateFromLog(log),
       memo: log.memo ?? '',
+      routine: routineFromLog(log),
     };
   }
   const mlMode = preferMl || (s.waterLevel == null && s.waterMl != null);
@@ -72,6 +76,7 @@ export function initialTodayForm(today: TodayResponse, preferMl = false): TodayF
     weight: weightFromReference(s.weightKg, lastWeight?.weightKg ?? null),
     symptoms: { ...INITIAL_SYMPTOM_STATE, codes: [] },
     memo: '',
+    routine: { ...EMPTY_ROUTINE },
   };
 }
 
@@ -132,11 +137,15 @@ export function validateTodayForm(form: TodayForm): string | null {
   return null;
 }
 
-/** PUT /api/pets/{petId}/daily-logs/{recordDate} 본문 (계약 5장과 같은 8개 필드) */
-export function buildDailyLogBody(form: TodayForm): DailyLogBody {
+/**
+ * PUT /api/pets/{petId}/daily-logs/{recordDate} 본문 (계약 5장의 8개 필드 + 루틴 2개).
+ * 루틴 두 필드는 baselineRoutine(화면을 불러온/저장한 시점의 값)과 달라졌을 때만 싣는다(안 적음으로 지움 = null 명시).
+ * 같으면 키를 생략한다: 서버는 생략 = 기존 값 유지라서, 루틴을 안 건드린 기기가 다른 기기의 값을 지우지 않는다(docs/api-routine.md 1장).
+ */
+export function buildDailyLogBody(form: TodayForm, baselineRoutine: RoutineState): DailyLogBody {
   const mlText = form.waterMl.text.trim();
   const weightKg = form.weight.measured ? Math.round(Number(form.weight.text) * 100) / 100 : null;
-  return {
+  const body: DailyLogBody = {
     foodLevel: form.food.value,
     waterLevel: form.waterMode === 'level' ? form.water.value : null,
     waterMl: form.waterMode === 'ml' && mlText !== '' ? Number(mlText) : null,
@@ -144,6 +153,11 @@ export function buildDailyLogBody(form: TodayForm): DailyLogBody {
     ...toSymptomFields(form.symptoms),
     memo: form.memo.slice(0, MEMO_MAX_LENGTH),
   };
+  if (isRoutineDirty(form.routine, baselineRoutine)) {
+    body.walkCount = form.routine.walk;
+    body.poopCount = form.routine.poop;
+  }
+  return body;
 }
 
 /** 첫 사용(빈) 상태: 저장된 기록도, 제안값도, 지난 체중도 없음 */
@@ -164,6 +178,7 @@ export function isFirstUse(today: TodayResponse): boolean {
  * - 제안값(점선)을 그대로 둔 것은 바뀐 것이 아니다. 탭·입력으로 확정하거나 바꾼 값만 센다.
  * - 바꿨다가 원래대로 돌려놓은 것은 바뀐 것이 아니다(값 비교). 메모는 앞뒤 공백을 무시한다.
  * - 물 입력 방식(waterMode)은 기기 선호라서 비교하지 않는다.
+ * - 루틴(산책·배변 횟수)은 값만 비교한다. 접고 펴기는 화면 상태라 여기에 없다.
  */
 export function isFormDirty(form: TodayForm, baseline: TodayForm): boolean {
   const level = (a: LevelField, b: LevelField) => a.value !== b.value || a.source !== b.source;
@@ -174,5 +189,6 @@ export function isFormDirty(form: TodayForm, baseline: TodayForm): boolean {
   const b = baseline.symptoms;
   if (a.none !== b.none || a.other.trim() !== b.other.trim()) return true;
   if ([...a.codes].sort().join() !== [...b.codes].sort().join()) return true;
+  if (isRoutineDirty(form.routine, baseline.routine)) return true;
   return form.memo.trim() !== baseline.memo.trim();
 }

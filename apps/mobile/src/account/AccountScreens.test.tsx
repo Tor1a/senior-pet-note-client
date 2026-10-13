@@ -208,6 +208,7 @@ describe('회원 탈퇴', () => {
     expect(screen.getByText('한 번 지우면 되돌릴 수 없어요.')).toBeTruthy();
     expect(screen.getByText('・ 반려동물 프로필과 사진')).toBeTruthy();
     expect(screen.getAllByText(/^・ /)).toHaveLength(7);
+    expect(screen.getByText('・ 매일 적은 체중·식사·물·증상·메모, 산책·배변 횟수')).toBeTruthy(); // 루틴 기록 삭제 범위
     const names = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel);
     expect(names.indexOf('그대로 두기')).toBeLessThan(names.indexOf('탈퇴 계속하기'));
     await fireEvent.press(screen.getByRole('button', { name: '그대로 두기' }));

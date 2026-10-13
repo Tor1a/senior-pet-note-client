@@ -179,7 +179,7 @@ describe('오늘 화면 — 조회와 제안값', () => {
       return c!;
     });
     expect(put.path).toBe('/api/pets/pet-1/daily-logs/2026-10-06');
-    // 계약 5장 필드 8개와 정확히 같아야 한다 (체중은 [오늘 쟀어요]를 안 눌렀으니 null)
+    // 계약 5장 필드 8개와 정확히 같아야 한다(루틴은 안 바꿨으니 두 키 생략 = 서버가 기존 값 유지) (체중은 [오늘 쟀어요]를 안 눌렀으니 null)
     expect(put.body).toEqual({
       foodLevel: 2,
       waterLevel: 2,

@@ -105,7 +105,7 @@ describe('오늘 화면 — 조회와 제안값', () => {
     await screen.findByText('✓ 오늘 기록을 남겼어요. 수고하셨어요');
     const put = calls.find((c) => c.method === 'PUT')!;
     expect(put.url).toBe('/api/pets/pet-1/daily-logs/2026-10-06');
-    expect(put.body).toEqual({ foodLevel: 2, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: '' });
+    expect(put.body).toEqual({ foodLevel: 2, waterLevel: 2, waterMl: null, weightKg: null, symptoms: [], symptomsNone: true, symptomOther: null, memo: '' }); // 루틴은 안 바꿨으니 두 키 생략(서버가 기존 값 유지)
     expect(screen.getByRole('button', { name: '기록 수정하기' })).toBeTruthy();
     expect(calls.some((c) => c.url === '/api/events' && (c.body as { name: string }).name === 'daily_log_saved')).toBe(true);
   });
