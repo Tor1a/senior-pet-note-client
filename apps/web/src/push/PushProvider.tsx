@@ -12,6 +12,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { formatTime } from '../lib/format';
 import { medTargetQuery, parseMedReminderData, type MedReminderData } from '../lib/reminderApi';
 import { RegistrationSupersededError } from '../lib/pushDevice';
+import { parseTodoReminderData, TODOS_PUSH_PATH, type TodoReminderData } from '../lib/todoApi';
+import { bannerTitle, TODO_TEXT } from '../lib/todoText';
 import { registerWebDevice } from './device';
 import { isMobileDevice, readBrowserEnv, webPush } from './webPush';
 
@@ -47,6 +49,13 @@ export type PushDeviceState =
 
 /** 포그라운드에서 받은 투약 알림 */
 export interface PushBannerMessage extends MedReminderData {
+  key: string;
+  title: string;
+  body: string;
+}
+
+/** 포그라운드에서 받은 할 일 알림 (제목은 서버가 보낸 알림 문구 그대로) */
+export interface TodoBannerMessage extends TodoReminderData {
   key: string;
   title: string;
   body: string;
@@ -101,6 +110,7 @@ export const todayPushPath = (data: Pick<MedReminderData, 'medicationId' | 'sche
 export function PushProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PushDeviceState>('checking');
   const [messages, setMessages] = useState<PushBannerMessage[]>([]);
+  const [todoMessages, setTodoMessages] = useState<TodoBannerMessage[]>([]);
   const listeners = useRef(new Set<(m: PushBannerMessage) => void>());
   const stateRef = useRef<PushDeviceState>('checking');
   const navigate = useNavigate();
@@ -178,6 +188,18 @@ export function PushProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     void webPush
       .onForeground((msg) => {
+        const todoData = parseTodoReminderData(msg.data);
+        if (todoData) {
+          // 할 일 알림: 투약 구독자(오늘 화면 새로 고침)에게는 알리지 않고 배너만 보인다
+          const item: TodoBannerMessage = {
+            ...todoData,
+            key: `${todoData.todoId}:${todoData.kind}:${todoData.dueDate}`,
+            title: bannerTitle(todoData.kind, msg.notification?.title),
+            body: msg.notification?.body ?? '',
+          };
+          setTodoMessages((list) => [...list.filter((m) => m.key !== item.key), item]);
+          return;
+        }
         const data = parseMedReminderData(msg.data);
         if (!data) return; // 알 수 없는 알림은 무시
         const item: PushBannerMessage = {
@@ -231,6 +253,16 @@ export function PushProvider({ children }: { children: ReactNode }) {
             const last = messages[messages.length - 1];
             setMessages([]);
             navigate(last ? todayPushPath(last) : TODAY_PUSH_PATH);
+          }}
+        />
+      )}
+      {todoMessages.length > 0 && (
+        <TodoPushBanner
+          messages={todoMessages}
+          onClose={() => setTodoMessages([])}
+          onOpen={() => {
+            setTodoMessages([]);
+            navigate(TODOS_PUSH_PATH);
           }}
         />
       )}
@@ -292,6 +324,51 @@ export function PushBanner({
           오늘 화면에서 체크하기
         </button>
       )}
+    </div>
+  );
+}
+
+/** 할 일 알림 인앱 배너. 투약 배너와 같은 모양, 버튼은 [할 일 열기]. Esc·[닫기]로 닫힘, 자동으로 사라지지 않는다 */
+export function TodoPushBanner({
+  messages,
+  onClose,
+  onOpen,
+}: {
+  messages: TodoBannerMessage[];
+  onClose: () => void;
+  onOpen: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const shown = messages.slice(0, BANNER_MAX_LINES);
+  const rest = messages.length - shown.length;
+
+  return (
+    <div className="push-banner" role="status">
+      <div className="row-between push-banner-head">
+        <p className="strong">
+          <span aria-hidden="true">🔔 </span>
+          {messages[messages.length - 1].title}
+        </p>
+        <button type="button" className="btn-link push-banner-close" aria-label="알림 닫기" onClick={onClose}>
+          {TODO_TEXT.bannerClose}
+        </button>
+      </div>
+      <ul className="push-banner-list">
+        {shown.map((m) => (
+          <li key={m.key}>{m.body}</li>
+        ))}
+      </ul>
+      {rest > 0 && <p className="muted">외 {rest}개</p>}
+      <button type="button" className="btn-primary" onClick={onOpen}>
+        {TODO_TEXT.bannerOpen}
+      </button>
     </div>
   );
 }

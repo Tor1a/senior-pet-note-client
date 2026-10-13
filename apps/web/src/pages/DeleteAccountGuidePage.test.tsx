@@ -54,7 +54,7 @@ describe('계정 삭제 안내 페이지', () => {
     expect(screen.getByText('오래곁')).toBeTruthy();
     const h2s = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
     expect(h2s).toEqual(['삭제되는 데이터', '삭제 방법', '처리 기간과 보관 정보']);
-    for (const item of ['계정(이메일, 비밀번호)', '반려동물 정보', '투약·알림 설정', '푸시 기기 정보', '사진']) {
+    for (const item of ['계정(이메일, 비밀번호)', '반려동물 정보', '투약·알림 설정', '할 일 일정(제목·일정 메모·병원 메모)', '푸시 기기 정보', '사진']) {
       expect(screen.getByText(item)).toBeTruthy();
     }
     expect(screen.getByText('서비스 데이터베이스에서는 즉시 삭제해요. 사진 파일은 이어서 지워요.')).toBeTruthy();

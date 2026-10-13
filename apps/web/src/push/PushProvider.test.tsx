@@ -161,3 +161,45 @@ describe('PushProvider — 포그라운드 배너(S8)', () => {
     expect(onMessage).not.toHaveBeenCalled();
   });
 });
+
+describe('PushProvider — 할 일 알림 배너', () => {
+  const TODO_MESSAGE: ForegroundMessage = {
+    notification: { title: '내일 일정이 있어요', body: '초코 · 광견병 접종 · 15:00' },
+    data: { type: 'todo_reminder', todoId: 't1', petId: 'p1', dueDate: '2026-10-20', kind: 'day_before', dueTime: '15:00' },
+  };
+
+  it('todo_reminder 면 배너(서버 알림 문구 그대로)와 [할 일 열기]를 보이고, 누르면 /todos?source=push 로 간다. 투약 구독자에게는 알리지 않는다', async () => {
+    const { onMessage } = renderProvider('/today');
+    await waitFor(() => expect(fake.foreground).toBeTruthy());
+    act(() => fake.foreground!(TODO_MESSAGE));
+
+    const banner = await screen.findByRole('status');
+    expect(banner.textContent).toContain('내일 일정이 있어요');
+    expect(banner.textContent).toContain('초코 · 광견병 접종 · 15:00');
+    expect(banner.textContent).not.toContain('먹였어요');
+    expect(onMessage).not.toHaveBeenCalled();
+
+    await userEvent.setup().click(screen.getByRole('button', { name: '할 일 열기' }));
+    expect(screen.getByTestId('probe').textContent).toContain('/todos?source=push');
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('알림 제목이 비어 있으면 종류에 맞는 기본 제목, [닫기]로 닫힌다', async () => {
+    renderProvider('/todos');
+    await waitFor(() => expect(fake.foreground).toBeTruthy());
+    act(() => fake.foreground!({ data: { ...TODO_MESSAGE.data!, kind: 'due_day' } }));
+    expect((await screen.findByRole('status')).textContent).toContain('오늘 일정이 있어요');
+    await userEvent.setup().click(screen.getByRole('button', { name: '알림 닫기' }));
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('필수 값이 빠진 todo_reminder 는 무시하고, 투약 배너 동작은 그대로다', async () => {
+    const { onMessage } = renderProvider('/today');
+    await waitFor(() => expect(fake.foreground).toBeTruthy());
+    act(() => fake.foreground!({ data: { type: 'todo_reminder', petId: 'p1' } }));
+    expect(screen.queryByRole('status')).toBeNull();
+    act(() => fake.foreground!(MED_MESSAGE));
+    expect((await screen.findByRole('status')).textContent).toContain('투약 시간이에요');
+    expect(onMessage).toHaveBeenCalledTimes(1);
+  });
+});

@@ -3,9 +3,11 @@ import { createApiClient } from '../lib/api';
 import { createPetApi } from '../lib/petApi';
 import { createReminderApi } from '../lib/reminderApi';
 import { createAccountApi } from '../lib/accountApi';
+import { createTodoApi } from '../lib/todoApi';
 
 export const api = createApiClient({ baseUrl: 'http://test', getToken: () => 'tok', onUnauthorized: () => {} });
 export const petApi = createPetApi(api);
 export const onUnauthorized = () => () => {};
 export const reminderApi = createReminderApi(api);
 export const accountApi = createAccountApi(api);
+export const todoApi = createTodoApi(api);

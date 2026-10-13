@@ -187,12 +187,13 @@ describe('회원 탈퇴', () => {
     await screen.findByRole('heading', { name: '탈퇴 확인' });
   }
 
-  it('단계 1 은 지워지는 내용 6개를 목록으로 보여 주고 [그대로 두기]가 먼저 나온다', async () => {
+  it('단계 1 은 지워지는 내용 7개(할 일 일정 포함)를 목록으로 보여 주고 [그대로 두기]가 먼저 나온다', async () => {
     setToken('t0');
     mockServer(() => null);
     renderAt('/account/delete');
     await screen.findByRole('heading', { name: '회원 탈퇴' });
-    expect(screen.getAllByRole('listitem')).toHaveLength(6);
+    expect(screen.getAllByRole('listitem')).toHaveLength(7);
+    expect(screen.getByText(/직접 적은 할 일 일정\(제목·일정 메모·병원 메모\)/)).toBeTruthy();
     const buttons = screen.getAllByRole('button').map((b) => b.textContent ?? '');
     expect(buttons[0]).toBe('그대로 두기');
     expect(buttons[1]).toContain('탈퇴 계속하기');

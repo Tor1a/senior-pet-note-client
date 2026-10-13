@@ -2,6 +2,7 @@ import { createApiClient } from './api';
 import { createPetApi } from './petApi';
 import { createReminderApi } from './reminderApi';
 import { createAccountApi } from './accountApi';
+import { createTodoApi } from './todoApi';
 import { apiConfig, DEFAULT_API_BASE_URL } from './config';
 import { clearToken, getToken } from './tokenStorage';
 
@@ -29,3 +30,6 @@ export const reminderApi = createReminderApi(api);
 
 /** 비밀번호 변경·회원 탈퇴 API (계약: docs/api-account.md) */
 export const accountApi = createAccountApi(api);
+
+/** 내 할 일 일정 API (계약: 기획서 5장 → docs/api-todos.md) */
+export const todoApi = createTodoApi(api);

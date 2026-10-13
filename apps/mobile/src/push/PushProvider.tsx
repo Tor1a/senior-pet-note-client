@@ -12,6 +12,8 @@ import { parseMedReminderData, type MedReminderData } from '../lib/reminderApi';
 import { push } from '../services/push';
 import type { PushMessage } from '../services/pushTypes';
 import { RegistrationSupersededError } from '../lib/pushDevice';
+import { parseTodoReminderData, TODOS_PUSH_PATH } from '../lib/todoApi';
+import { bannerTitle, TODO_TEXT } from '../lib/todoText';
 import { registerMobileDevice } from '../services/pushDevice';
 import { colors, spacing } from '../theme';
 import {
@@ -19,6 +21,7 @@ import {
   nextOpenNonce,
   todayPushHref,
   type PushBannerMessage,
+  type TodoBannerMessage,
   type PushContextValue,
   type PushDeviceState,
 } from './pushContext';
@@ -27,6 +30,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [state, setState] = useState<PushDeviceState>(push.available ? 'checking' : 'unavailable');
   const [messages, setMessages] = useState<PushBannerMessage[]>([]);
+  const [todoMessages, setTodoMessages] = useState<TodoBannerMessage[]>([]);
   const listeners = useRef(new Set<(m: PushBannerMessage) => void>());
   const pathname = usePathname();
   // 등록·권한 확인이 겹쳐 불려도(시작 recheck·onTokenRefresh·버튼) 한 번만 돈다
@@ -108,16 +112,34 @@ export function PushProvider({ children }: { children: ReactNode }) {
     [router],
   );
 
+  // 할 일 알림은 할 일 목록으로 연다. 이미 스택에 목록이 있으면 그 위의 화면(폼 등)을 닫고 목록으로 돌아온다
+  // (저장 안 한 입력이 있으면 그 화면의 이탈 확인 카드가 먼저 뜬다). 이 Provider 는 로그인한 동안에만 마운트되므로 인증 확인은 끝난 뒤다.
+  const goTodos = useCallback(() => router.dismissTo(TODOS_PUSH_PATH as never), [router]);
+
   // 토큰 갱신 → 다시 PUT, 포그라운드 알림 → 배너, 알림 탭 → 오늘 화면
   useEffect(() => {
     if (!push.available) return;
     const openToday = (msg: PushMessage) => {
+      // 할 일 알림 → 할 일 목록. 투약 알림 → 오늘 화면(기존 동작 그대로)
+      if (parseTodoReminderData(msg.data)) return goTodos();
       const data = parseMedReminderData(msg.data);
       if (data) goToday(data);
     };
     const offs = [
       push.onTokenRefresh(() => void recheck()),
       push.onForeground((msg) => {
+        const todoData = parseTodoReminderData(msg.data);
+        if (todoData) {
+          // 할 일 알림: 투약 구독자(오늘 화면 새로 고침)에게는 알리지 않고 배너만 보인다
+          const item: TodoBannerMessage = {
+            ...todoData,
+            key: `${todoData.todoId}:${todoData.kind}:${todoData.dueDate}`,
+            title: bannerTitle(todoData.kind, msg.title),
+            body: msg.body ?? '',
+          };
+          setTodoMessages((list) => [...list.filter((m) => m.key !== item.key), item]);
+          return;
+        }
         const data = parseMedReminderData(msg.data);
         if (!data) return; // 알 수 없는 알림은 무시
         const item: PushBannerMessage = {
@@ -133,7 +155,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
     ];
     void push.getInitial().then((msg) => msg && openToday(msg));
     return () => offs.forEach((off) => off());
-  }, [recheck, goToday]);
+  }, [recheck, goToday, goTodos]);
 
   const subscribe = useCallback((listener: (m: PushBannerMessage) => void) => {
     listeners.current.add(listener);
@@ -142,7 +164,8 @@ export function PushProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const bannerVisible = messages.length > 0;
+  const bannerVisibleMed = messages.length > 0;
+  const bannerVisible = bannerVisibleMed || todoMessages.length > 0;
   const value = useMemo<PushContextValue>(
     () => ({ state, requestPermission, recheck, bannerVisible, subscribe }),
     [state, requestPermission, recheck, bannerVisible, subscribe],
@@ -153,7 +176,7 @@ export function PushProvider({ children }: { children: ReactNode }) {
 
   return (
     <PushContext.Provider value={value}>
-      {bannerVisible && (
+      {bannerVisibleMed && (
         <PushBanner
           messages={messages}
           onToday={onToday}
@@ -162,6 +185,17 @@ export function PushProvider({ children }: { children: ReactNode }) {
             const last = messages[messages.length - 1];
             setMessages([]);
             goToday(last);
+          }}
+        />
+      )}
+      {todoMessages.length > 0 && (
+        <TodoPushBanner
+          messages={todoMessages}
+          withInset={!bannerVisibleMed}
+          onClose={() => setTodoMessages([])}
+          onOpen={() => {
+            setTodoMessages([]);
+            goTodos();
           }}
         />
       )}
@@ -205,6 +239,35 @@ export function PushBanner({
         <AppButton label="오늘 화면에서 체크하기" onPress={onOpenToday} />
       )}
       <AppButton label="닫기" variant="secondary" onPress={onClose} />
+    </View>
+  );
+}
+
+/** 할 일 알림 인앱 배너. 투약 배너와 같은 모양, 버튼은 [할 일 열기]. 자동으로 사라지지 않는다 */
+export function TodoPushBanner({
+  messages,
+  withInset = true,
+  onClose,
+  onOpen,
+}: {
+  messages: TodoBannerMessage[];
+  /** false 면 상단 안전 영역을 채우지 않는다(위에 투약 배너가 이미 채웠을 때) */
+  withInset?: boolean;
+  onClose: () => void;
+  onOpen: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+  const shown = messages.slice(0, BANNER_MAX_LINES);
+  const rest = messages.length - shown.length;
+  return (
+    <View style={[styles.banner, { paddingTop: spacing.md + (withInset ? insets.top : 0) }]} accessibilityRole="alert">
+      <AppText style={styles.bold}>{messages[messages.length - 1].title}</AppText>
+      {shown.map((m) => (
+        <AppText key={m.key}>{m.body}</AppText>
+      ))}
+      {rest > 0 && <AppText variant="secondary">{`외 ${rest}개`}</AppText>}
+      <AppButton label={TODO_TEXT.bannerOpen} onPress={onOpen} />
+      <AppButton label={TODO_TEXT.bannerClose} variant="secondary" onPress={onClose} />
     </View>
   );
 }

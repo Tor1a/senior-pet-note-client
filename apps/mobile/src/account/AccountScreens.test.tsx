@@ -203,11 +203,11 @@ describe('회원 탈퇴', () => {
   }
   const checkbox = () => screen.getByRole('checkbox', { name: /지워지는 내용을 읽었고/ });
 
-  it('단계 1: 지워지는 내용 6개와 [그대로 두기](먼저), [탈퇴 계속하기]', async () => {
+  it('단계 1: 지워지는 내용 7개(할 일 일정 포함)와 [그대로 두기](먼저), [탈퇴 계속하기]', async () => {
     await render(wrap(<AccountDeleteScreen />));
     expect(screen.getByText('한 번 지우면 되돌릴 수 없어요.')).toBeTruthy();
     expect(screen.getByText('・ 반려동물 프로필과 사진')).toBeTruthy();
-    expect(screen.getAllByText(/^・ /)).toHaveLength(6);
+    expect(screen.getAllByText(/^・ /)).toHaveLength(7);
     const names = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel);
     expect(names.indexOf('그대로 두기')).toBeLessThan(names.indexOf('탈퇴 계속하기'));
     await fireEvent.press(screen.getByRole('button', { name: '그대로 두기' }));
@@ -302,7 +302,7 @@ describe('회원 탈퇴', () => {
   it('글자 2.0배에서도 단계 1 목록과 두 버튼이 모두 있다', async () => {
     setFontScale(2);
     await render(wrap(<AccountDeleteScreen />));
-    expect(screen.getAllByText(/^・ /)).toHaveLength(6);
+    expect(screen.getAllByText(/^・ /)).toHaveLength(7);
     expect(screen.getByRole('button', { name: '탈퇴 계속하기' })).toBeTruthy();
   });
 });

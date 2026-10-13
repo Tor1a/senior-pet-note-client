@@ -355,3 +355,18 @@ input[type='date'] { min-height: 3rem; font-size: 1.1rem; }
 .bar-hint { margin: 0; font-size: 0.9rem; font-weight: 600; }
 .leave-dialog .confirm-card-box { border: none; padding: 0; background: transparent; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+/* ---------- 내 할 일 일정 (/todos, /todos/new, /todos/:id) ---------- */
+.todo-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem; margin: 0.75rem 0; }
+.todo-tabs button { min-height: 3.5rem; background: #fff; color: var(--text); border: 2px solid var(--sub); border-radius: 8px; font-weight: 600; }
+.todo-tabs button[aria-selected='true'] { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+.todo-list { list-style: none; padding: 0; margin: 0 0 0.5rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.todo-group-title { margin: 1rem 0 0.5rem; font-weight: 700; }
+.todo-row { display: flex; flex-direction: column; gap: 0.25rem; margin: 0; }
+.todo-row.is-done { background: #eef5f1; border-color: var(--done); }
+.todo-title { font-weight: 700; overflow-wrap: anywhere; }
+.todo-note { color: var(--sub); overflow-wrap: anywhere; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.todo-collapsed { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.5rem; min-height: 3rem; padding: 0.25rem 0.75rem; background: #eef5f1; border: 2px solid var(--done); border-radius: 12px; }
+.todo-collapsed .error { flex-basis: 100%; }
+.todo-page .card { display: flex; flex-direction: column; gap: 0.5rem; }
+.device-line p { margin: 0; }

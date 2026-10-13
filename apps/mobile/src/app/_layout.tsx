@@ -39,6 +39,9 @@ function RootNavigator() {
         <Stack.Screen name="history/index" />
         <Stack.Screen name="history/[recordDate]" />
         <Stack.Screen name="report/index" />
+        <Stack.Screen name="todos/index" />
+        <Stack.Screen name="todos/new" />
+        <Stack.Screen name="todos/[id]" />
         <Stack.Screen name="pet/new" />
         <Stack.Screen name="pet/edit" />
         <Stack.Screen name="account/index" />

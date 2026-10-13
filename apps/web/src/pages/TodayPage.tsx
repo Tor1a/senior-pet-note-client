@@ -10,6 +10,7 @@ import { PRIVACY_TEXT } from '../lib/privacyText';
 import { HISTORY_TEXT } from '../lib/historyText';
 import { bigDoseButtonLabel, PUSH_ACTION_TEXT } from '../lib/pushActionText';
 import { REPORT_TEXT } from '../lib/reportText';
+import { TODO_TEXT } from '../lib/todoText';
 import { daysBetween, formatKg, formatRecordDate, LEVEL_LABELS, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
 import {
@@ -960,6 +961,14 @@ export default function TodayPage() {
               <GuardLink guard={guardLeave} to="/account" className="history-link-row">
                 <span>계정 · 로그아웃</span>
               </GuardLink>
+
+              <section className="card" aria-labelledby="todo-entry-title">
+                <h2 id="todo-entry-title">{TODO_TEXT.entryTitle}</h2>
+                <p>{TODO_TEXT.entryBody}</p>
+                <GuardLink guard={guardLeave} to="/todos" className="btn-secondary link-button">
+                  {TODO_TEXT.entryButton}
+                </GuardLink>
+              </section>
 
               <p className="disclaimer">{DISCLAIMER}</p>
             </div>

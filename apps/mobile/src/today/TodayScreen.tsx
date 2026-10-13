@@ -58,6 +58,7 @@ import {
 } from '../lib/undoLogic';
 import { doseUndoFailText, doseUndoneText, UNDO_TEXT } from '../lib/undoText';
 import { HISTORY_HREF } from '../history/routes';
+import { TodayTodoCard } from '../todos/TodayTodoCard';
 import { isLargeFont } from '../medications/layout';
 import { REPORT_TEXT } from '../lib/reportText';
 import { REPORT_HREF } from '../report/routes';
@@ -804,6 +805,8 @@ export default function TodayScreen() {
               <AppText>{REPORT_TEXT.entryCardBody}</AppText>
               <AppButton label={REPORT_TEXT.entryCardButton} variant="secondary" onPress={goReport} />
             </Card>
+
+            <TodayTodoCard />
 
             <AppText variant="caption">{DISCLAIMER}</AppText>
           </View>

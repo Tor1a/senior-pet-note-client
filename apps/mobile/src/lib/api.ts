@@ -182,6 +182,7 @@ export type ErrorContext =
   | 'medication'
   | 'medLog'
   | 'dailyLog'
+  | 'todo'
   | 'password'
   | 'withdraw';
 
@@ -225,6 +226,7 @@ export function toUserMessage(err: unknown, context: ErrorContext = 'general'): 
   if (err.code === 'INVALID_FILE') return 'JPG, PNG, WEBP 사진만 올릴 수 있어요.';
   if (err.code === 'INVALID_RECORD_DATE') return '기록 날짜가 바뀌었어요. 화면을 새로 불러왔으니 다시 저장해 주세요.';
   if (err.code === 'PET_LIMIT_REACHED') return '반려동물은 한 마리만 등록할 수 있어요.';
+  if (err.code === 'TODO_LIMIT_REACHED') return '할 일을 더 등록할 수 없어요. 지난 할 일을 지운 뒤 다시 시도해 주세요.';
   if (err.code === 'ALREADY_CHECKED') return '이미 체크한 약이에요.';
   if (err.status === 409) {
     return context === 'signup' || context === 'login'
@@ -243,6 +245,8 @@ export function toUserMessage(err: unknown, context: ErrorContext = 'general'): 
         return '약 일정이 바뀐 것 같아요. 화면을 새로 불러왔어요.';
       case 'password':
         return '새 비밀번호를 사용할 수 없어요. 8자 이상(한글은 24자까지)으로, 지금 쓰는 것과 다르게 다시 정해 주세요.';
+      case 'todo':
+        return '입력한 내용을 확인해 주세요. 제목은 40자, 일정 메모는 200자, 병원 메모는 500자까지 적을 수 있고, 너무 먼 날짜는 고를 수 없어요.';
       case 'dailyLog':
         return '입력한 내용을 확인해 주세요. 체중은 0보다 크고 200kg보다 작게, 물은 0~20000ml로 적을 수 있어요.';
       default:

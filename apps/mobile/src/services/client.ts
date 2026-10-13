@@ -8,6 +8,7 @@ import { createApiClient } from '../lib/api';
 import { createPetApi } from '../lib/petApi';
 import { createReminderApi } from '../lib/reminderApi';
 import { createAccountApi } from '../lib/accountApi';
+import { createTodoApi } from '../lib/todoApi';
 import { resolveApiConfig } from './config';
 import { clearToken, getToken } from './tokenStorage';
 
@@ -41,3 +42,6 @@ export const petApi = createPetApi(api);
 
 /** 비밀번호 변경·회원 탈퇴 API (계약: docs/api-account.md) */
 export const accountApi = createAccountApi(api);
+
+/** 내 할 일 일정 API (계약: docs/api-todos.md) */
+export const todoApi = createTodoApi(api);

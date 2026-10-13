@@ -201,6 +201,16 @@ describe('오늘 화면 — 약 관리 진입', () => {
     expect(mockPush).toHaveBeenLastCalledWith('/report');
   });
 
+  it('맨 아래 "내 할 일 일정" 카드의 버튼이 할 일 목록으로 간다(새 요청 없음)', async () => {
+    setup();
+    await renderToday();
+    expect(screen.getByRole('header', { name: '내 할 일 일정' })).toBeTruthy();
+    expect(screen.getByText('병원에서 정한 날을 직접 적어 두고 알림을 받을 수 있어요.')).toBeTruthy();
+    await fireEvent.press(screen.getByRole('button', { name: '내 할 일 일정 보기' }));
+    expect(mockPush).toHaveBeenLastCalledWith('/todos');
+    expect((global.fetch as jest.Mock).mock.calls.some((c) => String(c[0]).includes('/todos'))).toBe(false);
+  });
+
   it('[약 관리 ›]·[약 관리 · 알림 설정]이 약 목록으로 가고, "웹에서 설정해요" 문구는 없다', async () => {
     setup();
     await renderToday();

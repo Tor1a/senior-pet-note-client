@@ -12,6 +12,7 @@
 //    (onBackgroundMessage 에서 showNotification 을 또 부르지 않는다 — 중복 표시 방지).
 //    서버가 webpush.notification.actions=[{action:'taken',title:'먹였어요'}] 를 보내면 Firebase SDK(@firebase/messaging 0.13.3 의
 //    showNotification)가 payload.notification 을 그대로 showNotification 옵션으로 넘기므로 버튼이 그대로 붙는다.
+// 4-1) 할 일 알림(data.type === 'todo_reminder')은 버튼 없이 본문 탭만 처리한다: /todos?source=push 를 연다(기획서 6-3).
 // 5) 알림 버튼 [먹였어요](event.action === 'taken')은 앱을 열지 않고 여기서 POST /api/med-logs 로 체크한다(lib/pushAction.ts).
 //    토큰은 페이지가 IndexedDB 에 둔 사본을 "읽기만" 한다(lib/swTokenStore.ts). 결과는 같은 tag 로 알림을 덮어써 보여 준다.
 //    요청 전에 같은 tag 로 "기록하는 중이에요"를 먼저 띄운다(버튼을 누르면 원래 알림이 닫힐 수 있어서). 소리 없음, 결과가 같은 tag 로 덮어쓴다.
@@ -32,6 +33,7 @@ import {
 } from './lib/pushAction';
 import { resolvePushConfig } from './lib/pushConfig';
 import { medTargetQuery, parseMedReminderData, type MedReminderData } from './lib/reminderApi';
+import { parseTodoReminderData, TODOS_PUSH_PATH } from './lib/todoApi';
 import { clearSwTokenIfEquals, readSwToken } from './lib/swTokenStore';
 
 declare const self: ServiceWorkerGlobalScope;
@@ -147,6 +149,12 @@ async function handleTaken(notification: Notification, data: MedReminderData | n
 self.addEventListener('notificationclick', (event) => {
   // 이 앱이 처리한다. Firebase 의 기본 클릭 처리기(링크 없으면 아무것도 안 함)는 건너뛴다
   event.stopImmediatePropagation();
+  // 할 일 알림(todo_reminder): 버튼 없음. 본문 탭은 할 일 목록을 연다(투약 알림 처리와 섞이지 않게 먼저 분기)
+  if (parseTodoReminderData(pushData(event.notification))) {
+    event.notification.close();
+    event.waitUntil(openApp(TODOS_PUSH_PATH));
+    return;
+  }
   const data = parseMedReminderData(pushData(event.notification));
   if (event.action === TAKEN_ACTION) {
     // 알림 버튼: 앱을 열지 않는다. 같은 tag 로 결과 알림이 원래 알림을 덮어쓴다(닫지 않는다 — 처리 도중 알림이 사라져 침묵하지 않게)

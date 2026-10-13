@@ -140,6 +140,15 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - **메모 안내:** 오늘 메모(`MemoSection`)와 반려동물 폼의 질환 입력칸 아래에 "반려동물의 기록만 적어 주세요. 보호자 본인의 건강 정보는 적지 마세요." 가 입력칸 바로 아래에 항상 보인다. `accessibilityHint` 는 쓰지 않는다: 보이는 글자가 이미 스크린리더에 읽혀 같은 문장이 두 번 낭독되기 때문이다(`accessibilityLabelledBy` 는 안드로이드 전용이라 쓰지 않았다). 문구는 `lib/privacyText.ts`(웹 원본의 사본).
 - 로그인 없이 보는 계정 삭제 안내 페이지(`/delete-account`)는 **웹에만** 있다.
 
+## 내 할 일 일정 (2026-10-13, 커밋 전)
+기획 `.company/plans/내-할-일-일정.md`(M1~M3), 설계 `.company/design/내-할-일-일정.md`, 계약 백엔드 `docs/api-todos.md`. 웹 `/todos` 와 같은 기능이고 **새 네이티브 모듈이 없다(개발 빌드 재생성 불필요, `package.json` 변경 없음).**
+- 화면: `src/todos/`(`TodosScreen` 목록 [예정][완료] 탭·`dateStatus` 묶음·제자리 접힘+[되돌리기], `TodoFormScreen` 추가/보기·고치기, `TodayTodoCard`, `TodoDeviceLine` 알림 상태 한 줄, `routes`, `todoMobileText` 모바일 전용 문구). 라우트 `app/todos/index.tsx`·`new.tsx`·`[id].tsx`(모두 `PetGate` 안, `_layout.tsx` 에 등록).
+- 진입점: 오늘 화면 [리포트] 카드 아래·면책 위 카드 `내 할 일 일정`(새 API 호출 없음). 알림 탭(`PushProvider`): `todo_reminder` 면 `router.dismissTo('/todos?source=push')`(백그라운드·종료 상태 모두; 투약 알림 처리는 그대로), 포그라운드면 [할 일 열기] 배너. Provider 가 로그인한 동안에만 마운트되므로 인증 확인 뒤에 이동한다.
+- 폼: 제목 40자·날짜(필수, 기본값 없음, 기존 `DateTimeField`)·시각(선택, [시각 지우기])·일정 메모 200자·알림 받기(기본 켬). 고치기 화면에만 병원 메모 500자·완료/완료 취소·[이 할 일 지우기](확인 카드 1회). 제목 칩·예시 글자·추천·반복은 없다. 권한은 [알림 허용하기] 버튼에서만 묻고, 알림이 막혀 있어도 저장된다. 고친 내용이 있으면 뒤로·스와이프·버튼 모두 `useLeaveGuard` 이탈 확인, 저장 중에는 이동만 막는다. 저장·지우기·404 뒤에는 목록으로 `dismissTo` + 안내 코드(`notice=created|updated|deleted|gone`).
+- 공유 사본: `todoApi/todoForm/todoList/todoText/todoFixtures`(+테스트), `api.ts`(`'todo'` 컨텍스트·`TODO_LIMIT_REACHED`). 웹 원본을 먼저 고쳤다(테스트의 `expect(값, 메시지)` 두 번째 인자와 동적 `import()` 제거 — Jest 에서 안 돌아서). `todoApi.test.ts` 는 `vi.fn` → `jest.fn`.
+- 계정 탈퇴 화면 삭제 목록에 `직접 적은 할 일 일정(제목·일정 메모·병원 메모)과 알림 발송 기록` 추가(웹 `AccountDeletePage` 와 같은 문구).
+- 실기기에서 확인하지 못함: 날짜·시각 선택기, VoiceOver/TalkBack 낭독, 글자 200% 모양, 알림 도착과 탭 이동(콜드 스타트 포함), 포그라운드 배너 위치. jest(RNTL)로만 확인.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
@@ -165,6 +174,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 | reminderForm.ts | 알림 설정 입력 상태↔PUT 본문, 검증, 요약·다음 알림·상태 줄 문구, `buildSaveBody`·`saveMessage`·`reminderStatusLabel` | reminderForm.test.ts · reminderForm.edge.test.ts (웹 테스트 사본) |
 | medicationForm.ts | 약 등록·수정 입력 검증·본문 변환·시각 추가/삭제 | medicationForm.test.ts (웹 테스트 사본) |
 | petForm.ts | 반려동물 등록·수정 입력 검증·본문 변환·변경 여부·저장 오류 분류(사진 제외) | petForm.test.ts (웹 테스트 사본) |
+| todoApi.ts · todoForm.ts · todoList.ts · todoText.ts · todoFixtures.ts | 할 일 API 타입·`parseTodoReminderData`, 폼 검증·본문 변환, `dateStatus` 묶음, 문구·`findTodoForbidden`, 테스트용 예시 | todo*.test.ts (웹 테스트 사본) |
 
 - 모바일 전용(services/): config, tokenStorage, client — 플랫폼마다 달라 사본으로 두지 않는다.
 - 웹에만 있고 아직 안 가져온 파일: photo (사진 화면을 만들 때 가져온다 — 사진은 2단계로 보류).
@@ -184,7 +194,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 2. (1단계 완료) 반려동물 등록·수정. **남은 것: 사진 업로드(2단계, `expo-image-picker` — 네이티브 모듈이라 대표님 승인과 개발 빌드 재생성 필요).**
 3. **푸시 알림(투약 알림):** `@react-native-firebase/messaging` 으로 구현됨. 알림 규칙(켜기/끄기·매일/요일/N일 간격·기간)은 앱의 약 관리 → 알림 설정 화면에서 정한다(웹과 같은 기능). 개발 빌드(`npx expo prebuild` + `npx expo run:android`)와 `google-services.json`(앱 루트, git 제외, 패키지명 `com.oraegyeot.seniorpet`)이 필요하다. Expo Go·웹 미리보기·설정 파일 없는 빌드에서는 알림만 꺼진다. 플랫폼별로 따로 판단하며 한쪽 파일만 있으면 경고를 출력하고 그쪽만 켠다. **EAS 클라우드 빌드**는 git 에 없는 설정 파일이 올라가지 않으므로 file secret 으로 넣는다: `eas env:create --name GOOGLE_SERVICES_JSON --type file --value ./google-services.json`(iOS 는 `GOOGLE_SERVICE_INFO_PLIST`). app.config.ts 가 이 환경변수 경로를 읽는다. iOS 는 `GoogleService-Info.plist` + APNs 키 + Apple 개발자 팀 필요(미검증).
 4. `packages/shared` 통합 (위 계획).
-5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 837개·63 스위트(2026-10-12 반려동물 등록·수정 1단계 + 리뷰·QA 수정 후).
+5. 화면 컴포넌트 테스트: `@testing-library/react-native` 14 + `test-renderer`(React 19.2·RN 0.86 에서 동작 확인, async API). 전체 948개·77 스위트(2026-10-13 내 할 일 일정 추가 후).
    jest 의 기본 글자 배율(fontScale)은 2 라서 평소 배치를 볼 때는 `testing/fontScale.ts` 의 `setFontScale(1)` 을 쓴다. expo-router·선택기는 `testing/mockRouter.ts`·`testing/mockDateTimePicker.tsx` 로 대체한다.
 6. 운영 API 는 반드시 `https://` 로. 정식(릴리스) 빌드의 안드로이드는 기본적으로 `http://` 통신을 막는다.
 

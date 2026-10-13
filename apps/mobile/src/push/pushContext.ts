@@ -2,6 +2,7 @@
 // - ui.tsx(Screen)가 bannerVisible 을 읽어야 해서 Provider 와 분리했다(Provider 는 ui.tsx 를 쓰므로 한 파일에 두면 순환 참조).
 import { createContext, useContext, useEffect, useRef } from 'react';
 import { medTargetQuery, type MedReminderData } from '../lib/reminderApi';
+import type { TodoReminderData } from '../lib/todoApi';
 
 export type PushDeviceState = 'checking' | 'unavailable' | 'default' | 'denied' | 'registering' | 'registered' | 'error';
 
@@ -15,6 +16,13 @@ export function cannotReceive(state: PushDeviceState): boolean {
 
 /** 포그라운드에서 받은 투약 알림 (웹 PushBannerMessage 와 같은 모양) */
 export interface PushBannerMessage extends MedReminderData {
+  key: string;
+  title: string;
+  body: string;
+}
+
+/** 포그라운드에서 받은 할 일 알림 (제목·본문은 서버가 보낸 알림 문구 그대로) */
+export interface TodoBannerMessage extends TodoReminderData {
   key: string;
   title: string;
   body: string;
