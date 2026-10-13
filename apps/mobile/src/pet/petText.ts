@@ -9,7 +9,7 @@ import type { Species } from '../lib/petApi';
 
 export const PET_TEXT = {
   // P0 시작 화면 (반려동물 없음)
-  startTitle: '시니어펫 노트',
+  startTitle: '오래곁',
   startCardTitle: '함께 지내는 아이를 소개해 주세요',
   startCardLead: '이름과 종류만 적어도 시작할 수 있어요.',
   startCardBody: '등록하고 나면 하루 기록과 약 체크를 시작할 수 있어요.',

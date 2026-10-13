@@ -1,4 +1,4 @@
-# 시니어펫 노트 — 웹 (React, Java 백엔드 호출)
+# 오래곁 — 웹 (React, Java 백엔드 호출)
 
 - 작성: developer / 2026-10-06 (기술 스택 변경 반영: `docs/decisions/2026-10-06-기술-스택-변경.md`)
 - 스택: Vite 8 + React 19 + TypeScript, vite-plugin-pwa(manifest·서비스워커), Vitest

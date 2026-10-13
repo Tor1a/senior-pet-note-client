@@ -3,7 +3,7 @@
 // 금지 표현 검사는 deleteGuideTexts() + findPrivacyForbidden() 으로 테스트가 한다.
 import { resolvePrivacyPolicyUrl } from './privacyConfig';
 
-export const SERVICE_NAME = '시니어펫 노트';
+export const SERVICE_NAME = '오래곁';
 
 export const DELETE_GUIDE_TEXT = {
   title: '계정 삭제 안내',

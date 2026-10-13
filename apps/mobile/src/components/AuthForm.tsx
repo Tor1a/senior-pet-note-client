@@ -63,7 +63,7 @@ export function AuthForm({ mode }: { mode: AuthMode }) {
   return (
     <Screen>
       <AppText variant="title" accessibilityRole="header">
-        {isSignup ? '회원가입' : '시니어펫 노트 로그인'}
+        {isSignup ? '회원가입' : '오래곁 로그인'}
       </AppText>
 
       {farewell ? (

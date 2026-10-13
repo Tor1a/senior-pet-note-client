@@ -29,7 +29,7 @@ export const REPORT_TEXT = {
   subtitle: '수의사에게 보여 드릴 요약이에요',
   printTitle: '병원 방문 요약 리포트',
   source: '보호자가 앱에 직접 적은 기록이에요.',
-  appName: '시니어펫 노트',
+  appName: '오래곁',
   backToToday: '← 오늘로',
   backToHistory: '← 지난 기록으로',
   entryCardTitle: '병원 방문 리포트',
@@ -99,7 +99,7 @@ export const REPORT_TEXT = {
   toToday: '오늘 화면으로',
   webOnlyShare: '공유는 앱에서 할 수 있어요.',
   textHead: '[병원 방문 요약]',
-  textFoot: '(시니어펫 노트)',
+  textFoot: '(오래곁)',
 } as const;
 
 /**

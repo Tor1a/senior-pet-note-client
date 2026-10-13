@@ -24,7 +24,7 @@ if (hasAndroid !== hasIos) {
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: '시니어펫 노트',
+  name: '오래곁',
   slug: 'senior-pet-note',
   version: '0.1.0',
   orientation: 'portrait',

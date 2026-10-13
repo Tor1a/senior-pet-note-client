@@ -51,7 +51,7 @@ describe('계정 삭제 안내 페이지', () => {
     stubFetch(401);
     renderApp();
     expect(await screen.findByRole('heading', { level: 1, name: '계정 삭제 안내' })).toBeTruthy();
-    expect(screen.getByText('시니어펫 노트')).toBeTruthy();
+    expect(screen.getByText('오래곁')).toBeTruthy();
     const h2s = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
     expect(h2s).toEqual(['삭제되는 데이터', '삭제 방법', '처리 기간과 보관 정보']);
     for (const item of ['계정(이메일, 비밀번호)', '반려동물 정보', '투약·알림 설정', '푸시 기기 정보', '사진']) {

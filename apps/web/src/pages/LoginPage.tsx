@@ -68,7 +68,7 @@ export default function LoginPage() {
 
   return (
     <main className="page">
-      <h1>시니어펫 노트</h1>
+      <h1>오래곁</h1>
       <p className="lead">매일 10초 기록, 진료 때 1장 리포트</p>
 
       {farewell && (

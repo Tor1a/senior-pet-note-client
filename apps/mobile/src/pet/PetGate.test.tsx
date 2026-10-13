@@ -110,7 +110,7 @@ describe('반려동물이 없을 때 시작 화면', () => {
       </PetProvider>,
     );
     await screen.findByText('함께 지내는 아이를 소개해 주세요');
-    expect(screen.getByText('시니어펫 노트')).toBeTruthy();
+    expect(screen.getByText('오래곁')).toBeTruthy();
     expect(screen.queryByText('먹이는 약')).toBeNull();
     expect(screen.getByText('이름과 종류만 적어도 시작할 수 있어요.')).toBeTruthy();
     expect(screen.getByText('등록하고 나면 하루 기록과 약 체크를 시작할 수 있어요.')).toBeTruthy();

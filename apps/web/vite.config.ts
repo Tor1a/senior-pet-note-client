@@ -36,9 +36,9 @@ export default defineConfig({
       filename: 'sw.ts',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png'],
       manifest: {
-        name: '시니어펫 노트',
-        short_name: '펫노트',
-        description: '노령·만성질환 반려동물의 투약과 컨디션을 매일 10초 안에 기록하는 노트',
+        name: '오래곁',
+        short_name: '오래곁',
+        description: '반려동물의 투약과 컨디션을 매일 10초 안에 기록하는 노트',
         lang: 'ko',
         start_url: '/',
         scope: '/',

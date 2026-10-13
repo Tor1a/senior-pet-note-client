@@ -44,7 +44,7 @@ export function DeviceCard({
           {stepsOpen ? (
             <AppText>
               {Platform.OS === 'ios'
-                ? 'iPhone: 설정 > 알림 > 시니어펫 노트 > 알림 허용을 켜요.'
+                ? 'iPhone: 설정 > 알림 > 오래곁 > 알림 허용을 켜요.'
                 : 'Android: 설정 > 알림(또는 앱 > 알림)을 켜요.'}
             </AppText>
           ) : null}

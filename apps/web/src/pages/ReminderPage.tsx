@@ -602,7 +602,7 @@ function DeviceCard({
               )}
               <li>이 화면으로 돌아오면 자동으로 확인해요.</li>
             </ol>
-            <p className="muted">홈 화면에 추가한 iPhone 앱이면: iPhone "설정" 앱 → "알림" → "펫노트"에서 "알림 허용"을 켜요.</p>
+            <p className="muted">홈 화면에 추가한 iPhone 앱이면: iPhone "설정" 앱 → "알림" → "오래곁"에서 "알림 허용"을 켜요.</p>
           </details>
         </InfoCard>
       );
@@ -615,7 +615,7 @@ function DeviceCard({
               <ol className="steps">
                 <li>화면 아래(iPad는 주소창)의 공유 버튼 [□↑ 공유]을 눌러요.</li>
                 <li>"홈 화면에 추가"를 눌러요.</li>
-                <li>홈 화면에 생긴 "펫노트" 아이콘으로 다시 열어요.</li>
+                <li>홈 화면에 생긴 "오래곁" 아이콘으로 다시 열어요.</li>
                 <li>다시 로그인한 뒤 알림 설정에서 [알림 허용하기]를 눌러요.</li>
               </ol>
               <p className="muted">iOS 16.4 이상에서만 돼요. 알림 설정은 저장해 둘 수 있어요.</p>
