@@ -235,7 +235,7 @@ export function toUserMessage(err: unknown, context: ErrorContext = 'general'): 
       case 'signup':
         return '입력한 내용을 확인해 주세요. 비밀번호는 8자 이상이어야 해요.';
       case 'pet':
-        return '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해는 1980년 이후, 질환은 200자까지 적을 수 있어요.';
+        return '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해와 날짜는 1980년 이후부터 오늘까지, 질환은 200자까지 적을 수 있어요.';
       case 'medication':
         return '입력한 내용을 확인해 주세요. 약 이름은 1~50자, 시각은 1~3개이고 서로 달라야 해요.';
       case 'medLog':

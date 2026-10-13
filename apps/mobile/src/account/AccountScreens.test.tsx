@@ -206,7 +206,7 @@ describe('회원 탈퇴', () => {
   it('단계 1: 지워지는 내용 7개(할 일 일정 포함)와 [그대로 두기](먼저), [탈퇴 계속하기]', async () => {
     await render(wrap(<AccountDeleteScreen />));
     expect(screen.getByText('한 번 지우면 되돌릴 수 없어요.')).toBeTruthy();
-    expect(screen.getByText('・ 반려동물 프로필과 사진')).toBeTruthy();
+    expect(screen.getByText('・ 반려동물 프로필(이름·종류·생일·입양일·함께 지내는 상황)과 사진')).toBeTruthy();
     expect(screen.getAllByText(/^・ /)).toHaveLength(7);
     expect(screen.getByText('・ 매일 적은 체중·식사·물·증상·메모, 산책·배변 횟수')).toBeTruthy(); // 루틴 기록 삭제 범위
     const names = screen.getAllByRole('button').map((b) => b.props.accessibilityLabel);

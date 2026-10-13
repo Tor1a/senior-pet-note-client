@@ -42,8 +42,8 @@ export const TODO_TEXT = {
 
   // 줄
   noTime: '시각 없음',
-  remindOn: '알림 켜짐',
-  remindOff: '알림 꺼짐',
+  remindOn: '알림 받기로 해 둠',
+  remindOff: '알림 안 받기로 해 둠',
   complete: '완료했어요',
   completing: '잠시만요…',
   undo: '되돌리기',
@@ -177,7 +177,7 @@ export function rowLabel(todo: Todo): string {
   return `${todo.title}, ${dateTimeLine(todo)}, ${remindLine(todo)}`;
 }
 
-export const completeLabel = (title: string) => `${title} 완료로 체크`;
+export const completeLabel = (title: string) => `완료했어요, ${title}`;
 export const undoLabel = (title: string) => `${title} 완료 체크 되돌리기`;
 export const cancelDoneLabel = (title: string) => `${title} 완료 취소`;
 export const openLabel = (title: string) => `${title} 보기·고치기`;

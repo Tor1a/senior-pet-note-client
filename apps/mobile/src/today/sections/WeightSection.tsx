@@ -78,7 +78,11 @@ export function WeightSection({
         onPress={onToggleMeasured}
       />
       {!weight.measured && (
-        <AppText variant="caption">[오늘 쟀어요]를 누르거나 숫자를 바꾸면 오늘 체중으로 저장돼요.</AppText>
+        <AppText variant="caption">
+          {weight.text
+            ? '[오늘 쟀어요]를 누르거나 숫자를 바꾸면 오늘 체중으로 저장돼요.'
+            : '체중을 적으면 오늘 체중으로 저장돼요.'}
+        </AppText>
       )}
       {children}
     </View>

@@ -163,6 +163,21 @@ describe('오늘 화면 — 조회와 제안값', () => {
     expect(screen.getByRole('button', { name: '오늘 기록 저장' })).toBeTruthy();
   });
 
+  it('페이지 제목 h1 은 날짜 하나이고, 체중이 비어 있으면 안내 문구가 비활성 버튼을 누르라고 하지 않는다', async () => {
+    mockServer({
+      'GET /api/pets/pet-1/today': () =>
+        json(200, todayExample({ suggestions: { foodLevel: 2, waterLevel: 2, waterMl: null, weightKg: null }, lastWeight: null })),
+    });
+    renderToday();
+
+    const h1 = await screen.findByRole('heading', { level: 1 });
+    expect(h1.textContent).toBe('10월 6일 (화)');
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect((screen.getByRole('button', { name: '오늘 쟀어요' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('체중을 적으면 오늘 체중으로 저장돼요.')).toBeTruthy();
+    expect(screen.queryByText(/\[오늘 쟀어요\]를 누르거나/)).toBeNull();
+  });
+
   it('[저장]을 누르면 제안값을 확정해 계약과 같은 본문으로 PUT 하고, 실선으로 바뀐다', async () => {
     const saved = dailyLogExample({ foodLevel: 2, waterLevel: 2, waterMl: null });
     const calls = mockServer({

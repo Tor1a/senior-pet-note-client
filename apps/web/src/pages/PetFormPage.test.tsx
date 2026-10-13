@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -103,7 +103,7 @@ describe('반려동물 등록 화면 — 검증', () => {
     expect(screen.getByRole('heading', { name: '반려동물을 소개해 주세요' })).toBeTruthy();
     expect(screen.getByText('이름과 종류만 적어도 시작할 수 있어요.')).toBeTruthy();
     expect(screen.getByRole('button', { name: '다음' })).toBeTruthy();
-    for (const r of screen.getAllByRole('radio')) expect(r.getAttribute('aria-checked')).toBe('false');
+    for (const r of within(screen.getByRole('radiogroup', { name: '종류' })).getAllByRole('radio')) expect(r.getAttribute('aria-checked')).toBe('false');
   });
 
   it('비워 두고 제출하면 이름·종류 오류를 보이고 서버를 부르지 않는다', async () => {
@@ -233,7 +233,7 @@ describe('반려동물 등록 화면 — 저장', () => {
     await userEvent.click(screen.getByRole('button', { name: '다음' }));
     const alert = await screen.findByRole('alert');
     expect(alert.textContent).toBe(
-      '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해는 1980년 이후, 질환은 200자까지 적을 수 있어요.',
+      '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해와 날짜는 1980년 이후부터 오늘까지, 질환은 200자까지 적을 수 있어요.',
     );
     expect((screen.getByLabelText('이름') as HTMLInputElement).value).toBe('보리');
     expect((screen.getByRole('button', { name: '다음' }) as HTMLButtonElement).disabled).toBe(false);

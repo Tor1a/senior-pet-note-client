@@ -6,6 +6,7 @@ import { withParticle } from '../lib/format';
 import { findForbidden } from '../lib/historyText';
 import { PET_FORM_ERRORS } from '../lib/petForm';
 import type { Species } from '../lib/petApi';
+import { findPetProfileForbidden, petProfileTexts } from '../lib/petProfileText';
 
 export const PET_TEXT = {
   // P0 시작 화면 (반려동물 없음)
@@ -81,6 +82,27 @@ export const PET_TEXT = {
   accountCardTitle: '반려동물',
 } as const;
 
+/** 유형·생일·입양일 시트와 읽는 문구 중 모바일 전용인 것 (화면 문구 본체는 공유 사본 lib/petProfileText.ts) */
+export const PET_DATE_TEXT = {
+  sheetBirthMonth: '생일 월',
+  sheetBirthDay: '생일 일',
+  sheetAdoptYear: '입양한 해',
+  sheetAdoptMonth: '입양한 월',
+  sheetAdoptDay: '입양한 일',
+  sheetNone: '적지 않음',
+  fieldHint: '누르면 고를 수 있어요',
+  toggleA11y: '날짜 자세히 적기, 선택 항목',
+  announceNone: '적지 않음으로 정했어요',
+} as const;
+
+export const chosenMonthText = (m: number) => `${m}월로 정했어요`;
+export const chosenDayText = (d: number) => `${d}일로 정했어요`;
+export const chosenYearText = (y: number) => `${y}년으로 정했어요`;
+/** 유형 라디오 읽기: "처음 키워요, 3개 중 1번째" (종류 버튼과 같은 규칙) */
+export const typeChoiceLabel = (label: string, index: number, total: number) => `${label}, ${total}개 중 ${index + 1}번째`;
+/** 날짜 칸 읽기: "생일 월, 선택 안 함" / "입양일 연도, 2024년" */
+export const dateFieldLabel = (name: string, shown: string) => `${name}, ${shown}`;
+
 export const createdTitle = (name: string) => `${withParticle(name, '를', '을')} 등록했어요.`;
 export const updatedTitle = (name: string) => `${name} 정보를 고쳤어요.`;
 export const remainingText = (n: number) => `남은 글자 ${n}자`;
@@ -104,9 +126,20 @@ export function findPetForbidden(): { text: string; hit: string } | null {
     entryLinkLabel('보리'),
     petSummary('dog', 2012),
     petSummary('cat', null),
+    ...Object.values(PET_DATE_TEXT),
+    chosenMonthText(10),
+    chosenDayText(13),
+    chosenYearText(2024),
+    typeChoiceLabel('처음 키워요', 0, 3),
+    dateFieldLabel('입양일 연도', '2024년'),
   ];
   for (const text of texts) {
     const hit = findForbidden(text);
+    if (hit) return { text, hit };
+  }
+  // 유형·생일·입양일 문구는 추가 금지어(노령·초보·권장 등)까지 본다
+  for (const text of petProfileTexts()) {
+    const hit = findPetProfileForbidden(text);
     if (hit) return { text, hit };
   }
   return null;

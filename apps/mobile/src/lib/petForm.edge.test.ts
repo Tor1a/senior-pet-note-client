@@ -235,7 +235,7 @@ describe('저장 본문 전체', () => {
     expect(toPetInput(d({ name: ' 보리 ' }))).toEqual({ name: '보리', species: 'dog', birthYear: null, conditions: null });
   });
   it('전부 입력', () => {
-    expect(toPetInput({ name: '보리', species: 'cat', birthYear: '2012', conditions: ' 신부전 ' })).toEqual({
+    expect(toPetInput(d({ name: '보리', species: 'cat', birthYear: '2012', conditions: ' 신부전 ' }))).toEqual({
       name: '보리', species: 'cat', birthYear: 2012, conditions: '신부전',
     });
   });

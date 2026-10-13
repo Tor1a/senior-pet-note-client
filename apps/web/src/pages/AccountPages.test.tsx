@@ -195,6 +195,7 @@ describe('회원 탈퇴', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(7);
     expect(screen.getByText(/직접 적은 할 일 일정\(제목·일정 메모·병원 메모\)/)).toBeTruthy();
     expect(screen.getByText('매일 적은 체중·식사·물·증상·메모, 산책·배변 횟수')).toBeTruthy(); // 루틴 기록 삭제 범위
+    expect(screen.getByText('반려동물 프로필(이름·종류·생일·입양일·함께 지내는 상황)과 사진')).toBeTruthy(); // 유형·날짜 삭제 범위
     const buttons = screen.getAllByRole('button').map((b) => b.textContent ?? '');
     expect(buttons[0]).toBe('그대로 두기');
     expect(buttons[1]).toContain('탈퇴 계속하기');

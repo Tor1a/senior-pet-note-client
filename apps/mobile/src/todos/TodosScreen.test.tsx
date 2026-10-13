@@ -42,7 +42,7 @@ describe('할 일 목록 — 예정', () => {
     for (const name of ['지난 일정', '오늘', '내일', '그 이후']) expect(screen.getByRole('header', { name })).toBeTruthy();
     expect(screen.getByText('10월 13일 (화) · 오후 2:30')).toBeTruthy();
     expect(screen.getByText('10월 10일 (토)')).toBeTruthy();
-    expect(screen.getByText('알림 꺼짐')).toBeTruthy();
+    expect(screen.getByText('알림 안 받기로 해 둠')).toBeTruthy();
     expect(screen.getByText(/추천하지 않아요/)).toBeTruthy();
     expect(screen.getByText('본 기록은 의료적 판단을 대신하지 않습니다.')).toBeTruthy();
     expect(screen.getByRole('radio', { name: '예정' }).props.accessibilityState.checked).toBe(true);
@@ -75,15 +75,15 @@ describe('할 일 목록 — 예정', () => {
       },
     });
     await renderWith(<TodosScreen />);
-    await fireEvent.press(await screen.findByRole('button', { name: '정기 검진 완료로 체크' }));
+    await fireEvent.press(await screen.findByRole('button', { name: '완료했어요, 정기 검진' }));
 
     expect(await screen.findByRole('button', { name: '정기 검진 완료 체크 되돌리기' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: '정기 검진 완료로 체크' })).toBeNull();
+    expect(screen.queryByRole('button', { name: '완료했어요, 정기 검진' })).toBeNull();
     expect(screen.getByText(`✓ ${TODO_TEXT.completedNotice}`)).toBeTruthy();
     expect(calls.find((c) => c.method === 'PUT')?.body).toEqual({ completed: true });
 
     await fireEvent.press(screen.getByRole('button', { name: '정기 검진 완료 체크 되돌리기' }));
-    expect(await screen.findByRole('button', { name: '정기 검진 완료로 체크' })).toBeTruthy();
+    expect(await screen.findByRole('button', { name: '완료했어요, 정기 검진' })).toBeTruthy();
     expect(calls.filter((c) => c.method === 'PUT').map((c) => c.body)).toEqual([{ completed: true }, { completed: false }]);
     expect(screen.getByText(`✓ ${TODO_TEXT.undoneNotice}`)).toBeTruthy();
   });
@@ -98,10 +98,10 @@ describe('할 일 목록 — 예정', () => {
         }),
     });
     await renderWith(<TodosScreen />);
-    const button = await screen.findByRole('button', { name: '정기 검진 완료로 체크' });
+    const button = await screen.findByRole('button', { name: '완료했어요, 정기 검진' });
     await fireEvent.press(button);
     await fireEvent.press(button);
-    expect(screen.getByRole('button', { name: '정기 검진 완료로 체크' }).props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByRole('button', { name: '완료했어요, 정기 검진' }).props.accessibilityState.disabled).toBe(true);
     expect(screen.getByText(TODO_TEXT.completing)).toBeTruthy();
     release();
     await screen.findByRole('button', { name: '정기 검진 완료 체크 되돌리기' });
@@ -114,13 +114,13 @@ describe('할 일 목록 — 예정', () => {
       'PUT /api/todos/t-today/completion': () => json(500, { code: 'INTERNAL', message: 'x' }),
     });
     await renderWith(<TodosScreen />);
-    await fireEvent.press(await screen.findByRole('button', { name: '정기 검진 완료로 체크' }));
+    await fireEvent.press(await screen.findByRole('button', { name: '완료했어요, 정기 검진' }));
     const alert = await screen.findByRole('alert');
     const text = JSON.stringify(alert.props.children);
     expect(text).toContain('완료로 체크하지 못했어요.');
     expect(text).toContain('서버에 잠시 문제가 있어요');
     expect(text).toContain('한 번 더 눌러 주세요');
-    expect(screen.getByRole('button', { name: '정기 검진 완료로 체크' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '완료했어요, 정기 검진' })).toBeTruthy();
   });
 
   it('완료 체크 중 404(이미 지워짐): 안내하고 목록을 다시 불러온다', async () => {
@@ -133,7 +133,7 @@ describe('할 일 목록 — 예정', () => {
       'PUT /api/todos/t-today/completion': () => json(404, { code: 'NOT_FOUND', message: 'x' }),
     });
     await renderWith(<TodosScreen />);
-    await fireEvent.press(await screen.findByRole('button', { name: '정기 검진 완료로 체크' }));
+    await fireEvent.press(await screen.findByRole('button', { name: '완료했어요, 정기 검진' }));
     await screen.findByText(TODO_TEXT.emptyOpenTitle);
     expect(screen.getByText(`✓ ${TODO_TEXT.gone}`)).toBeTruthy();
   });

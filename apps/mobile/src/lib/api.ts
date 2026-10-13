@@ -1,4 +1,4 @@
-// [공유 로직 사본] 원본: web/src/lib/api.ts (2026-10-08 복사)
+// [공유 로직 사본] 원본: web/src/lib/api.ts (2026-10-13 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
 // 백엔드(Java, Spring Boot) API 클라이언트
@@ -238,7 +238,7 @@ export function toUserMessage(err: unknown, context: ErrorContext = 'general'): 
       case 'signup':
         return '입력한 내용을 확인해 주세요. 비밀번호는 8자 이상이어야 해요.';
       case 'pet':
-        return '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해는 1980년 이후, 질환은 200자까지 적을 수 있어요.';
+        return '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해와 날짜는 1980년 이후부터 오늘까지, 질환은 200자까지 적을 수 있어요.';
       case 'medication':
         return '입력한 내용을 확인해 주세요. 약 이름은 1~50자, 시각은 1~3개이고 서로 달라야 해요.';
       case 'medLog':

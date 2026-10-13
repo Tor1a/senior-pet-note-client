@@ -161,6 +161,17 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 설계와 달라진 점: 제목에 헤더 역할(`accessibilityRole="header"`)을 따로 두지 않았다(토글 버튼 안에 제목이 있어 버튼 하나로 읽힘). 값 칸 `adjustable` 동작(VoiceOver 증감)은 후속(설계상 선택).
 - 테스트 결과(2026-10-13): 82스위트 999개 통과(기준선 77/948). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독, Android liveRegion)와 실제 서버 연동은 확인하지 못했다. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
 
+## 반려동물 유형·생일·입양일 — 온보딩 C단계 (2026-10-13, 커밋 전)
+기획 `.company/plans/초보-견주-온보딩-C-E-F.md` 2장, 설계 `.company/design/초보-견주-온보딩-C.md`, 계약 백엔드 `docs/api-pet-profile.md`. 웹과 같은 기능이고 **새 네이티브 모듈·`package.json` 변경이 없다(개발 빌드 재생성 불필요).** E·F 는 아직 없다.
+- 화면: `src/pet/PetFormScreen.tsx`(등록·수정 공통). 종류 아래 `함께 지내는 상황 (선택)` 라디오 3개(`처음 키워요`/`나이 든 아이예요`/`나중에 정할게요`, 기본 = 나중에 = `profileType` null), 태어난 해 아래 접힌 행 `날짜 자세히 적기 (선택)`(생일 월·일, 입양일 연·월·일). 저장된 날짜가 있으면 열린 채 시작하고, 저장할 때 오류가 안에 있으면 펼친 뒤 첫 오류 칸으로 스크롤·포커스한다. 접었을 때 값이 있으면 요약 한 줄(`생일 10월 13일 · 입양 2024년 3월 2일`).
+- 시트: `src/pet/OptionSheet.tsx`(YearSheet 패턴을 일반화한 목록 시트 + `PickField` 칸). `YearSheet` 는 이를 부르는 얇은 래퍼. 줄을 눌러도 [완료]에서 반영, 월은 1~12월, 일은 고른 해·월의 말일까지, 입양 연도는 올해부터 1980년(처음 위치는 올해). 선택 뒤 `{n}월로 정했어요` 등을 읽어 준다.
+- 칸 연동: 태어난 해를 바꿔 없는 날(2/29)이 되면 일만 비우고 안내, 태어난 해를 지우면 생일 월·일도 비우고 안내(`changeBirthYear` 등, 공유 사본).
+- 검사·본문: `validatePetDraft(draft, todayParts(new Date()))` — **`today` 를 화면이 명시해서 넘긴다**(웹 함수의 기본값에 맡기지 않음; `PetFormScreen.profile.test.tsx` 가 호출 인자를 고정). 본문은 `toPetInput(draft, 저장된 pet)`: 유형·생일·입양일은 저장값과 달라진 키만 실리고(안 건드리면 생략 = 서버가 유지, 지우면 null), 기존 사용자의 PUT 본문은 이전과 같다.
+- 나가기 확인: `isPetDraftDirty` 가 새 필드를 비교한다. 날짜 행을 접고 펴는 것은 dirty 가 아니다.
+- 글자 확대: `fontScale` 1.3 이상(`isLargeFont`)에서 월·일, 연·월·일 칸을 세로로 쌓는다. 유형 라디오는 처음부터 세로. 접근성: 유형 `처음 키워요, 3개 중 1번째`, 접힌 행 `날짜 자세히 적기, 선택 항목`(+요약, expanded 상태), 날짜 칸 `생일 월, 선택 안 함`/힌트 `누르면 고를 수 있어요`.
+- 공유 사본: 신규 `petProfile/petProfileText`(+`petProfile.test`, `petProfileText.test`, `petFormProfile.test`), 수정 `petForm/petApi/api`(+`petForm.test`). 서버 400 문구에 날짜 포함. 계정 탈퇴 화면 삭제 목록 문구를 웹과 같게(`반려동물 프로필(이름·종류·생일·입양일·함께 지내는 상황)과 사진`). 모바일 전용 문구는 `pet/petText.ts` 의 `PET_DATE_TEXT` 등, 금지어 검사 `findPetForbidden()` 이 `findPetProfileForbidden` 까지 본다.
+- 테스트 결과(2026-10-13): 86스위트 1063개 통과(기준선 82/999). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독, 시트 스크롤, 폼 길이)와 실제 서버 연동은 확인하지 못했다. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.
@@ -185,7 +196,8 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 | reminderApi.ts | 알림 규칙·기기 토큰 API 계약 타입과 createReminderApi | (화면 테스트로 확인) |
 | reminderForm.ts | 알림 설정 입력 상태↔PUT 본문, 검증, 요약·다음 알림·상태 줄 문구, `buildSaveBody`·`saveMessage`·`reminderStatusLabel` | reminderForm.test.ts · reminderForm.edge.test.ts (웹 테스트 사본) |
 | medicationForm.ts | 약 등록·수정 입력 검증·본문 변환·시각 추가/삭제 | medicationForm.test.ts (웹 테스트 사본) |
-| petForm.ts | 반려동물 등록·수정 입력 검증·본문 변환·변경 여부·저장 오류 분류(사진 제외) | petForm.test.ts (웹 테스트 사본) |
+| petForm.ts | 반려동물 등록·수정 입력 검증·본문 변환·변경 여부·저장 오류 분류(사진 제외), 유형·생일·입양일 칸 연동 | petForm.test.ts · petFormProfile.test.ts (웹 테스트 사본) |
+| petProfile.ts · petProfileText.ts | 유형·생일·입양일 날짜 계산(`daysInMonth`·`todayParts` 등), 문구·`findPetProfileForbidden` | petProfile.test.ts · petProfileText.test.ts (웹 테스트 사본) |
 | todoApi.ts · todoForm.ts · todoList.ts · todoText.ts · todoFixtures.ts | 할 일 API 타입·`parseTodoReminderData`, 폼 검증·본문 변환, `dateStatus` 묶음, 문구·`findTodoForbidden`, 테스트용 예시 | todo*.test.ts (웹 테스트 사본) |
 
 - 모바일 전용(services/): config, tokenStorage, client — 플랫폼마다 달라 사본으로 두지 않는다.

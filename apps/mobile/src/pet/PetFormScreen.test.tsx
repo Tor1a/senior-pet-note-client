@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react-native';
 import { AccessibilityInfo } from 'react-native';
 import { NETWORK_ERROR_MESSAGE } from '../lib/api';
 import { pressTwiceInOneFrame } from '../testing/doublePress';
@@ -62,7 +62,7 @@ describe('반려동물 등록 폼', () => {
     expect(screen.getByLabelText('이름')).toBeTruthy();
     expect(screen.getByLabelText('종류').props.accessibilityRole).toBe('radiogroup');
     expect(screen.getByLabelText('종류').props.style.flexDirection).toBe('row');
-    for (const r of screen.getAllByRole('radio')) expect(r.props.accessibilityState.checked).toBe(false);
+    for (const r of within(screen.getByLabelText('종류')).getAllByRole('radio')) expect(r.props.accessibilityState.checked).toBe(false);
     expect(screen.getByText('선택 안 함')).toBeTruthy();
     expect(screen.getByLabelText('앓고 있는 질환 (선택)')).toBeTruthy();
     expect(screen.getByRole('button', { name: '등록하기' })).toBeTruthy();
@@ -162,7 +162,7 @@ describe('반려동물 등록 폼', () => {
     await renderForm('new');
     await fillNew();
     await fireEvent.press(saveNew());
-    await screen.findByText('입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해는 1980년 이후, 질환은 200자까지 적을 수 있어요.');
+    await screen.findByText('입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해와 날짜는 1980년 이후부터 오늘까지, 질환은 200자까지 적을 수 있어요.');
     expect(screen.getByLabelText('이름').props.value).toBe('보리');
     expect(screen.getByRole('button', { name: '등록하기' }).props.accessibilityState.disabled).toBe(false);
     expect(mockRouter.dismissTo).not.toHaveBeenCalled();

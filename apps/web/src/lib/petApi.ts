@@ -2,9 +2,11 @@
 // - 기록 날짜(새벽 4시 규칙)와 제안값(최근 7일 평균)은 서버가 계산한다. 웹은 받은 값을 표시만 한다.
 // - 계약을 바꾸려면 비서실장에게 먼저 알린다. 여기서 임의로 필드를 바꾸지 않는다.
 import type { ApiClient } from './api';
+import type { PetProfileType } from './petProfile';
 import type { SymptomCode } from './symptoms';
 
 export type Species = 'dog' | 'cat';
+export type { PetProfileType } from './petProfile';
 
 export interface Pet {
   id: string;
@@ -13,16 +15,30 @@ export interface Pet {
   birthYear: number | null;
   conditions: string | null;
   hasPhoto: boolean;
+  /**
+   * 유형·생일·입양일(계약 docs/api-pet-profile.md). 응답에는 항상 있고 값이 없으면 null.
+   * 옛 서버 응답에는 키가 없을 수 있어 읽는 쪽은 ?? null 로 읽는다.
+   */
+  profileType?: PetProfileType | null;
+  /** "YYYY-MM-DD" 달력 날짜 */
+  birthDate?: string | null;
+  adoptedOn?: string | null;
   createdAt: string;
   updatedAt: string;
 }
 
-/** POST /api/pets, PUT /api/pets/{id} 본문 */
+/**
+ * POST /api/pets, PUT /api/pets/{id} 본문
+ * profileType·birthDate·adoptedOn: 생략 = 서버가 기존 값 유지, null = 지움 (name·species·birthYear·conditions 는 전체 교체)
+ */
 export interface PetInput {
   name: string;
   species: Species;
   birthYear?: number | null;
   conditions?: string | null;
+  profileType?: PetProfileType | null;
+  birthDate?: string | null;
+  adoptedOn?: string | null;
 }
 
 export interface Medication {

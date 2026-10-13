@@ -105,12 +105,23 @@ describe('todoText — 모든 문구가 금지 표현 검사를 통과한다', (
   });
 });
 
+describe('todoText — 완료 버튼 이름·알림 줄 오해 방지', () => {
+  it('완료 버튼의 접근 가능한 이름은 보이는 글자로 시작한다', () => {
+    expect(completeLabel('정기 검진').startsWith(TODO_TEXT.complete)).toBe(true);
+    expect(findTodoForbidden(completeLabel(''))).toBeNull();
+  });
+  it('알림 줄은 이 기기가 아니라 이 할 일의 설정임을 드러낸다', () => {
+    expect(remindLine({ remind: true })).not.toBe('알림 켜짐');
+    expect(remindLine({ remind: true })).toContain('받기로');
+  });
+});
+
 describe('todoText — 문장 조립', () => {
   it('날짜·시각 줄과 알림 줄', () => {
     expect(dateTimeLine({ dueDate: '2026-10-20', dueTime: '15:00' })).toBe('10월 20일 (화) · 오후 3:00');
     expect(dateTimeLine({ dueDate: '2026-10-20', dueTime: null })).toBe('10월 20일 (화)');
-    expect(remindLine({ remind: true })).toBe('알림 켜짐');
-    expect(remindLine({ remind: false })).toBe('알림 꺼짐');
+    expect(remindLine({ remind: true })).toBe('알림 받기로 해 둠');
+    expect(remindLine({ remind: false })).toBe('알림 안 받기로 해 둠');
   });
   it('알림 안내는 기획서 시각(하루 전 20:00, 당일 09:00)을 보여 준다', () => {
     expect(remindInfoText()).toBe('하루 전 오후 8:00, 당일 오전 9:00에 알려 드려요.');

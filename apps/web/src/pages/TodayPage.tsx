@@ -632,7 +632,7 @@ export default function TodayPage() {
     <div className="today" onClickCapture={countTap} inert={leaveTo ? true : undefined}>
       <header className="today-header">
         <div className="row-between">
-          <p className="today-date">{today ? formatRecordDate(today.recordDate) : '오늘'}</p>
+          <h1 className="today-date">{today ? formatRecordDate(today.recordDate) : '오늘'}</h1>
           <nav className="top-links" aria-label="바로가기">
             <GuardLink guard={guardLeave} to="/history" className="btn-link menu-link">
               지난 기록
@@ -912,7 +912,13 @@ export default function TodayPage() {
                 >
                   {form.weight.measured ? '✓ 오늘 쟀어요' : '오늘 쟀어요'}
                 </button>
-                {!form.weight.measured && <p className="muted small">[오늘 쟀어요]를 누르거나 숫자를 바꾸면 오늘 체중으로 저장돼요.</p>}
+                {!form.weight.measured && (
+                  <p className="muted small">
+                    {form.weight.text
+                      ? '[오늘 쟀어요]를 누르거나 숫자를 바꾸면 오늘 체중으로 저장돼요.'
+                      : '체중을 적으면 오늘 체중으로 저장돼요.'}
+                  </p>
+                )}
                 {weightAsk && today.lastWeight && (
                   <ConfirmCard
                     key={weightAsk.tick}

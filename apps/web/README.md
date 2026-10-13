@@ -170,6 +170,16 @@ src/
 - 로직·문구: `lib/routineForm.ts`, `lib/routineText.ts`(`findRoutineForbidden`). 모바일 `src/lib/` 에 사본이 있다.
 - 확인하지 못한 것: 실제 서버 연동, 실제 브라우저의 큰 글씨·스크린리더 낭독. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
 
+## 반려동물 유형·생일·입양일 — 온보딩 C단계 (2026-10-13, 커밋 전)
+
+기획 `.company/plans/초보-견주-온보딩-C-E-F.md` 2장, 설계 `.company/design/초보-견주-온보딩-C.md`, 계약 백엔드 `docs/api-pet-profile.md`. 웹만 구현(모바일·E·F 아직).
+- 화면: `PetFormPage`(등록 `/pets/new`·수정 `/pet` 모두). 종류 아래 `함께 지내는 상황 (선택)` 세로 라디오 3개(`처음 키워요` / `나이 든 아이예요` / `나중에 정할게요`=null, 기본), 태어난 해 아래 접힌 행 `날짜 자세히 적기 (선택)`(생일 월·일, 입양일 연·월·일 `<select>`). 저장된 날짜가 있으면 펼친 채 열리고, 저장 시 날짜 오류가 있으면 펼쳐 첫 오류 칸에 포커스.
+- 요청 본문: `profileType`·`birthDate`·`adoptedOn` 은 저장된 값(base)과 달라졌을 때만 키를 넣고(안 건드리면 생략 = 서버가 유지), 지울 때만 `null`. `birthYear` 는 기존대로 항상 보낸다. 접힘/펼침은 dirty 가 아니다. 태어난 해를 바꾸면 월·일은 유지(그 해에 없는 날이면 일만 비움), 태어난 해를 지우면 월·일도 비운다.
+- 검증(저장할 때, 기기 달력 날짜 기준 `validatePetDraft(draft, today)`): 생일 월·일 한쪽만, 월·일은 있고 태어난 해 없음, 없는 날짜, 미래, 입양일 일부만, 입양일<생일. 입양일 연도만 태어난 해보다 이른 경우는 막지 않는다(서버와 동일). 서버 400 문구는 날짜까지 포함하도록 `lib/api.ts` 확장.
+- 공유 lib(모바일이 복사할 대상): `petProfile.ts`(날짜 계산·`PetProfileType`·`todayParts`), `petProfileText.ts`(문구 상수·`petDateSummary`·`findPetProfileForbidden`), `petForm.ts`·`petApi.ts`·`api.ts` 수정분. 문구 상수 전체를 금지어 검사 테스트(`petProfileText.test.ts`)에 건다.
+- 계정 탈퇴 삭제 범위 문구(`deleteGuide.ts`, `AccountDeletePage`)에 생일·입양일·함께 지내는 상황 반영.
+- 테스트 77파일 887개, `npm run build` 성공, `grep -c fake-indexeddb dist/sw.js` = 0. 실서버 연동·실기기·글자 확대·스크린리더·실제 폼 높이는 확인하지 못함. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
+
 ## 테스트
 
 `npm test` — 52개 파일, 643개 (2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA·반려동물 폼 추출 포함. 아래 목록은 초기 6개 파일 내역).

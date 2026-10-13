@@ -26,13 +26,14 @@ const PET: Pet = {
   updatedAt: '2026-10-01T00:00:00Z',
 };
 
-const ok = { name: '보리', species: 'dog' as const, birthYear: '', conditions: '' };
+const ok = { ...EMPTY_PET_DRAFT, name: '보리', species: 'dog' as const };
 
 describe('draftFromPet', () => {
   it('없으면 빈 폼(종류는 고르지 않은 상태), 있으면 저장된 값', () => {
-    expect(draftFromPet(null)).toEqual({ name: '', species: null, birthYear: '', conditions: '' });
-    expect(draftFromPet(PET)).toEqual({ name: '보리', species: 'dog', birthYear: '2012', conditions: '신부전' });
+    expect(draftFromPet(null)).toEqual({ ...EMPTY_PET_DRAFT, name: '', species: null, birthYear: '', conditions: '' });
+    expect(draftFromPet(PET)).toEqual({ ...EMPTY_PET_DRAFT, name: '보리', species: 'dog', birthYear: '2012', conditions: '신부전' });
     expect(draftFromPet({ ...PET, birthYear: null, conditions: null })).toEqual({
+      ...EMPTY_PET_DRAFT,
       name: '보리',
       species: 'dog',
       birthYear: '',
@@ -91,7 +92,7 @@ describe('validatePetDraft', () => {
 
 describe('toPetInput', () => {
   it('이름·질환은 다듬고 해는 숫자로, 비면 null', () => {
-    expect(toPetInput({ name: ' 보리 ', species: 'cat', birthYear: '2015', conditions: ' 심장병 ' })).toEqual({
+    expect(toPetInput({ ...EMPTY_PET_DRAFT, name: ' 보리 ', species: 'cat', birthYear: '2015', conditions: ' 심장병 ' })).toEqual({
       name: '보리',
       species: 'cat',
       birthYear: 2015,
@@ -168,7 +169,7 @@ describe('classifyPetSaveError', () => {
   it('400 은 pet 문맥 문구, 연결 실패는 공통 문구, 사진 문맥은 사진 문구', () => {
     expect(classifyPetSaveError(http(400, 'VALIDATION_ERROR'), true)).toEqual({
       kind: 'message',
-      message: '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해는 1980년 이후, 질환은 200자까지 적을 수 있어요.',
+      message: '입력한 내용을 확인해 주세요. 이름은 1~30자, 태어난 해와 날짜는 1980년 이후부터 오늘까지, 질환은 200자까지 적을 수 있어요.',
     });
     expect(classifyPetSaveError(new ApiError('network', 0, null, 'x'), false)).toEqual({
       kind: 'message',

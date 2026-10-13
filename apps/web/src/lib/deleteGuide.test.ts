@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DELETE_GUIDE_TEXT, deleteGuideTexts, isValidSupportEmail, resolveDeleteGuide } from './deleteGuide';
+import { findPetProfileForbidden } from './petProfileText';
 import { findPrivacyForbidden } from './privacyText';
 import { findRoutineForbidden } from './routineText';
 
@@ -7,6 +8,11 @@ describe('계정 삭제 안내 문구·환경변수', () => {
   it('삭제 범위에 산책·배변 횟수가 들어 있고 루틴 금지 표현 검사도 통과한다', () => {
     expect(DELETE_GUIDE_TEXT.dataItems).toContain('일일 기록(체중·식사·물·증상·메모, 산책·배변 횟수)');
     for (const text of deleteGuideTexts()) expect({ text, hit: findRoutineForbidden(text) }).toEqual({ text, hit: null });
+  });
+
+  it('삭제 범위에 반려동물 생일·입양일·함께 지내는 상황(유형)이 들어 있고 유형·날짜 금지어 검사도 통과한다', () => {
+    expect(DELETE_GUIDE_TEXT.dataItems).toContain('반려동물 정보(이름·종류·생일·입양일·함께 지내는 상황)');
+    for (const text of deleteGuideTexts()) expect({ text, hit: findPetProfileForbidden(text) }).toEqual({ text, hit: null });
   });
 
   it('고정 문구에 금지 표현과 "확인 필요" 같은 미정 표시가 없다', () => {
