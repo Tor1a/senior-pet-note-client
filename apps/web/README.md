@@ -180,6 +180,17 @@ src/
 - 계정 탈퇴 삭제 범위 문구(`deleteGuide.ts`, `AccountDeletePage`)에 생일·입양일·함께 지내는 상황 반영.
 - 테스트 77파일 887개, `npm run build` 성공, `grep -c fake-indexeddb dist/sw.js` = 0. 실서버 연동·실기기·글자 확대·스크린리더·실제 폼 높이는 확인하지 못함. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
 
+## 함께한 날 · 기록 N일째 — 온보딩 E단계 (2026-10-14, 커밋 전)
+
+기획 `.company/plans/초보-견주-온보딩-C-E-F.md` 3장, 설계 `.company/design/초보-견주-온보딩-E.md`, 계약 백엔드 `GET /api/pets/{petId}/today` 의 `companion{togetherDays, recordingDays}`(first_time 아니면 null). 웹만 구현(모바일·F 아직).
+- 오늘 화면 헤더 반려동물 줄 아래 한 줄씩 보조색 텍스트(`components/CompanionLine.tsx`, 카드·아이콘·강조·`aria-live` 없음): `{이름}와/과 함께한 지 N일째`, `기록을 시작한 지 N일째`. 그릴 문장이 없으면 `null` 을 돌려줘 빈 컨테이너도 없다.
+- 그리는 조건: `today.companion` 이 있고 `pet.profileType === 'first_time'`(대표님 결정: 서버 null 외 2차 방어), 숫자는 줄마다 1 이상 정수일 때만(0·음수·소수·NaN·null 은 그 줄 생략), 이름이 비면 함께한 줄 생략. 로딩·오류 때는 그리지 않는다. 날짜 계산은 클라이언트에 없다(서버 숫자만 표시).
+- 글자 확대: `.companion-line` 에 `word-break: keep-all; overflow-wrap: anywhere`.
+- 타입: `TodayResponse.companion?: Companion | null`(optional, 구버전 응답 허용).
+- 공유 lib(모바일이 복사할 대상): `companionText.ts`(`COMPANION_TEXT`·`companionLines`·`companionTexts`·`findCompanionForbidden`) + `petApi.ts` 의 `Companion`·`TodayResponse.companion` 수정분. 금지어 검사는 문구 상수 샘플 출력 전체에 건다(`일째`는 허용).
+- 테스트: 시니어·유형 미선택 헤더 `outerHTML` 이 companion 유무와 상관없이 동일함을 `TodayPage.test.tsx` 에서 고정. 웹 79파일 920개, `npm run build` 성공, `grep -c fake-indexeddb dist/sw.js` = 0. spn.* 저장 키 변경 없음.
+- 확인하지 못한 것: 실서버 연동(백엔드 `docs/api-companion.md` 가 아직 없어 기획서 계약으로 작성), 실제 브라우저의 글자 확대·스크린리더 낭독.
+
 ## 테스트
 
 `npm test` — 52개 파일, 643개 (2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA·반려동물 폼 추출 포함. 아래 목록은 초기 6개 파일 내역).

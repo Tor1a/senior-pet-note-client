@@ -114,6 +114,8 @@ export default function TodayScreen() {
   );
 
   const [today, setToday] = useState<TodayResponse | null>(null);
+  // 헤더의 함께한 날 줄(E단계). 서버 값을 그대로 담는다. 약 관리 등에서 돌아올 때 투약과 함께 다시 맞춘다
+  const [companion, setCompanion] = useState<TodayResponse['companion']>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [doses, setDoses] = useState<DoseView[]>([]);
   const [doseMessage, setDoseMessage] = useState<string | null>(null);
@@ -179,6 +181,7 @@ export default function TodayScreen() {
 
   const applyToday = useCallback((t: TodayResponse, preferMl: boolean) => {
     setToday(t);
+    setCompanion(t.companion ?? null);
     setDoses(toDoseViews(t.doses));
     setSavedLog(t.dailyLog);
     setForm(initialTodayForm(t, preferMl));
@@ -215,6 +218,7 @@ export default function TodayScreen() {
       const t = await petApi.getToday(petId);
       if (seq !== syncSeq.current) return; // 더 새 요청이 있거나 그 사이 체크·취소가 있었음
       setDoses((list) => mergeServerDoses(list, t.doses)); // 응답 대기 중인 회차는 낙관적 상태 유지
+      setCompanion(t.companion ?? null); // 반려동물 정보 수정 화면에서 유형을 바꾸고 돌아온 경우 포함
     } catch (err) {
       isPetGone(err);
     }
@@ -256,6 +260,7 @@ export default function TodayScreen() {
           if (seq !== syncSeq.current) return;
           if (t.recordDate === todayRef.current?.recordDate) {
             setDoses((list) => mergeServerDoses(list, t.doses));
+            setCompanion(t.companion ?? null);
           } else {
             // 새 날짜: 입력 중이던 값은 버리고 새 응답으로 교체한다(저장해도 서버가 400 으로 거부하므로)
             applyToday(t, await readPreferMl());
@@ -682,6 +687,8 @@ export default function TodayScreen() {
         dateText={today ? formatRecordDate(today.recordDate) : '오늘'}
         petName={name}
         info={buildHeaderInfo(pet, today)}
+        companion={today ? companion : null}
+        profileType={pet?.profileType}
       />
 
       {largeFont && dailyNoticeView}

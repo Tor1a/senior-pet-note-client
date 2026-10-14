@@ -744,3 +744,76 @@ describe('오늘 화면 — 지난 기록 진입', () => {
     expect(screen.getByRole('link', { name: '리포트 보기' }).getAttribute('href')).toBe('/report');
   });
 });
+
+describe('오늘 화면 — 함께한 날 · 기록 N일째 (온보딩 E단계)', () => {
+  const FIRST: Pet = { ...PET, profileType: 'first_time' };
+  const SENIOR: Pet = { ...PET, profileType: 'senior' };
+
+  function renderWith(pet: Pet, today: unknown) {
+    mockServer({ 'GET /api/pets/pet-1/today': () => json(200, today) });
+    const view = render(
+      <MemoryRouter initialEntries={['/today']}>
+        <PetContext.Provider value={{ status: 'ready', pet, reload: vi.fn(async () => {}), setPet: vi.fn() }}>
+          <TodayPage />
+        </PetContext.Provider>
+      </MemoryRouter>,
+    );
+    return view;
+  }
+  const header = (c: HTMLElement) => c.querySelector('header.today-header') as HTMLElement;
+
+  it('first_time + 두 값: 반려동물 줄 바로 아래에 두 줄', async () => {
+    const { container } = renderWith(FIRST, todayExample({ companion: { togetherDays: 120, recordingDays: 45 } }));
+    expect(await screen.findByText('보리와 함께한 지 120일째')).toBeTruthy();
+    expect(screen.getByText('기록을 시작한 지 45일째')).toBeTruthy();
+    const h = header(container);
+    expect(h.children[1].className).toBe('pet-line');
+    expect(h.children[2].className).toBe('companion-line');
+  });
+
+  it('입양일 없음이면 기록 줄만', async () => {
+    renderWith(FIRST, todayExample({ companion: { togetherDays: null, recordingDays: 1 } }));
+    expect(await screen.findByText('기록을 시작한 지 1일째')).toBeTruthy();
+    expect(screen.queryByText(/함께한 지/)).toBeNull();
+  });
+
+  it('로딩 중과 불러오기 오류 때는 아무것도 그리지 않는다', async () => {
+    mockServer({ 'GET /api/pets/pet-1/today': () => json(500, { code: 'X', message: 'x' }) });
+    const { container } = render(
+      <MemoryRouter initialEntries={['/today']}>
+        <PetContext.Provider value={{ status: 'ready', pet: FIRST, reload: vi.fn(async () => {}), setPet: vi.fn() }}>
+          <TodayPage />
+        </PetContext.Provider>
+      </MemoryRouter>,
+    );
+    expect(container.querySelector('.companion-line')).toBeNull();
+    await screen.findByRole('alert');
+    expect(container.querySelector('.companion-line')).toBeNull();
+  });
+
+  it('시니어·유형 없음: 헤더 DOM 이 companion 이 없던 때와 글자 하나 다르지 않다', async () => {
+    const baseline = renderWith(SENIOR, todayExample());
+    await baseline.findByText('10월 6일 (화)');
+    const expected = header(baseline.container).outerHTML;
+    cleanup();
+
+    const noType: Pet = { ...PET };
+    for (const [pet, companion] of [
+      [SENIOR, null],
+      [SENIOR, { togetherDays: 5, recordingDays: 5 }],
+      [noType, null],
+      [noType, { togetherDays: 5, recordingDays: 5 }],
+    ] as const) {
+      const v = renderWith(pet, todayExample({ companion }));
+      await v.findByText('10월 6일 (화)');
+      expect(header(v.container).outerHTML).toBe(expected);
+      expect(v.container.querySelector('.companion-line')).toBeNull();
+      cleanup();
+    }
+    expect(expected).not.toContain('일째');
+    // 헤더 자식은 기존 두 개(날짜 줄, 반려동물 줄)뿐
+    const probe = document.createElement('div');
+    probe.innerHTML = expected;
+    expect(probe.firstElementChild!.children).toHaveLength(2);
+  });
+});

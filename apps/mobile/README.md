@@ -172,6 +172,14 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 공유 사본: 신규 `petProfile/petProfileText`(+`petProfile.test`, `petProfileText.test`, `petFormProfile.test`), 수정 `petForm/petApi/api`(+`petForm.test`). 서버 400 문구에 날짜 포함. 계정 탈퇴 화면 삭제 목록 문구를 웹과 같게(`반려동물 프로필(이름·종류·생일·입양일·함께 지내는 상황)과 사진`). 모바일 전용 문구는 `pet/petText.ts` 의 `PET_DATE_TEXT` 등, 금지어 검사 `findPetForbidden()` 이 `findPetProfileForbidden` 까지 본다.
 - 테스트 결과(2026-10-13): 86스위트 1063개 통과(기준선 82/999). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독, 시트 스크롤, 폼 길이)와 실제 서버 연동은 확인하지 못했다. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
 
+## 함께한 날 · 기록 N일째 — 온보딩 E단계 (2026-10-14, 커밋 전)
+기획 `.company/plans/초보-견주-온보딩-C-E-F.md` 3장, 설계 `.company/design/초보-견주-온보딩-E.md`, 계약 백엔드 `docs/api-companion.md`. 웹과 같은 기능이고 **새 네이티브 모듈·`package.json` 변경이 없다(개발 빌드 재생성 불필요).** F 는 아직 없다.
+- 화면: `src/today/sections/CompanionLine.tsx`(신규)를 `TodayHeader` 의 반려동물 줄(`petLine`) 바로 다음에 둔다. 카드·아이콘·강조 없음, `AppText variant="secondary"`(본문 18, 보조색), `numberOfLines` 없음(글자 확대 시 줄바꿈만 늘어남). 두 줄을 `accessible` View 하나로 묶고 `accessibilityLabel` 은 보이는 문장을 `, ` 로 이은 것(`보리와 함께한 지 120일째, 기록을 시작한 지 45일째`). 라이브 영역·알림 없음.
+- 그리는 조건: `today.companion` 이 있고 `pet.profileType === 'first_time'`, 줄마다 1 이상 정수일 때만. 로딩·오류·null·필드 없음이면 View 를 만들지 않는다. 시니어·유형 미선택의 헤더 렌더 트리는 줄 없는 헤더와 같다(`CompanionLine.test.tsx` 가 JSON 비교로 고정).
+- 유형을 바꾼 뒤 반영: 수정 화면은 오늘 화면 위에 쌓이고(오늘 화면이 살아 있음) 저장 후 `dismissTo` 로 돌아온다. 기존에는 돌아올 때 `syncDoses` 가 투약만 다시 읽어 `companion` 이 갱신되지 않았다. 그래서 `TodayScreen` 에 `companion` 상태를 두고 `load`/`applyToday`, 포커스 복귀 `syncDoses`, 같은 날짜 앱 복귀 재확인에서 서버 값으로 맞춘다(first_time 으로 바꾸면 돌아오자마자 줄이 보이고, senior 로 바꾸면 `profileType` 검사로 즉시 숨는다). 새 요청은 없다(기존 `/today` 재조회에 얹음).
+- 공유 사본(웹과 헤더 3줄 외 동일): 신규 `lib/companionText.ts`(+`companionText.test.ts`, 테스트는 vitest import 한 줄과 `expect` 메시지 인자 2곳만 다름), 수정 `lib/petApi.ts`(`Companion` 타입, `TodayResponse.companion?`). `withParticle`(`format.ts`)·`findForbidden`(`historyText.ts`)은 모바일에 이미 사본이 있다. 클라이언트에 날짜 계산 없음.
+- 테스트 결과(2026-10-14): 타입체크 오류 없음, 90스위트 1105개 통과(기준선 87/1068, 신규 3스위트 37개). 웹 79파일 920개·빌드 성공. 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독)와 실제 서버 연동은 확인하지 못했다.
+
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).
 - 토큰(JWT)은 `expo-secure-store` 에 저장(iOS Keychain / Android Keystore). 앱 시작 때 읽어 `/api/me` 로 확인한다.

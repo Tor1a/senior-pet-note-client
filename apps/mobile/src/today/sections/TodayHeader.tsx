@@ -2,9 +2,23 @@
 import { StyleSheet, View } from 'react-native';
 import { AppText } from '../../components/ui';
 import { PetAvatar } from '../../pet/PetAvatar';
+import type { Companion } from '../../lib/petApi';
 import { spacing } from '../../theme';
+import { CompanionLine } from './CompanionLine';
 
-export function TodayHeader({ dateText, petName, info }: { dateText: string; petName: string; info: string }) {
+export function TodayHeader({
+  dateText,
+  petName,
+  info,
+  companion,
+  profileType,
+}: {
+  dateText: string;
+  petName: string;
+  info: string;
+  companion?: Companion | null;
+  profileType?: string | null;
+}) {
   return (
     <View style={styles.header}>
       <AppText variant="title" accessibilityRole="header">
@@ -14,6 +28,7 @@ export function TodayHeader({ dateText, petName, info }: { dateText: string; pet
         <PetAvatar name={petName} size={48} />
         <AppText style={styles.info}>{info}</AppText>
       </View>
+      <CompanionLine companion={companion} name={petName} profileType={profileType} />
     </View>
   );
 }

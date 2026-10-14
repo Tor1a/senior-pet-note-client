@@ -1,4 +1,4 @@
-// [공유 로직 사본] 원본: web/src/lib/petApi.ts (2026-10-13 복사)
+// [공유 로직 사본] 원본: web/src/lib/petApi.ts (2026-10-14 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
 // 반려동물·투약·"오늘" 화면 API (계약: projects/senior-pet-note/docs/api-today.md v1)
@@ -101,6 +101,12 @@ export interface Suggestions {
   weightKg: number | null;
 }
 
+/** 온보딩 E단계: 함께한 날·기록 시작 일수. 서버가 계산한다(first_time 이 아니면 null). 구버전 응답에는 필드가 없을 수 있다 */
+export interface Companion {
+  togetherDays: number | null;
+  recordingDays: number | null;
+}
+
 export interface TodayResponse {
   recordDate: string;
   cutoffNotice: string;
@@ -108,6 +114,7 @@ export interface TodayResponse {
   dailyLog: DailyLog | null;
   suggestions: Suggestions;
   lastWeight: { weightKg: number; recordDate: string } | null;
+  companion?: Companion | null;
 }
 
 export interface MedLog {

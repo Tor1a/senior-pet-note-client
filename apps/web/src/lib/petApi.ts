@@ -98,6 +98,12 @@ export interface Suggestions {
   weightKg: number | null;
 }
 
+/** 온보딩 E단계: 함께한 날·기록 시작 일수. 서버가 계산한다(first_time 이 아니면 null). 구버전 응답에는 필드가 없을 수 있다 */
+export interface Companion {
+  togetherDays: number | null;
+  recordingDays: number | null;
+}
+
 export interface TodayResponse {
   recordDate: string;
   cutoffNotice: string;
@@ -105,6 +111,7 @@ export interface TodayResponse {
   dailyLog: DailyLog | null;
   suggestions: Suggestions;
   lastWeight: { weightKg: number; recordDate: string } | null;
+  companion?: Companion | null;
 }
 
 export interface MedLog {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link, useNavigate, useSearchParams, type LinkProps } from 'react-router-dom';
 import ConfirmCard from '../components/ConfirmCard';
+import CompanionLine from '../components/CompanionLine';
 import PetAvatar from '../components/PetAvatar';
 import RoutineSection from '../components/RoutineSection';
 import UndoNotice from '../components/UndoNotice';
@@ -646,6 +647,7 @@ export default function TodayPage() {
           <PetAvatar pet={pet} size={40} />
           <span>{headerInfo}</span>
         </div>
+        <CompanionLine companion={today?.companion} name={pet?.name ?? ''} profileType={pet?.profileType} />
       </header>
 
       <main className="page today-main">
