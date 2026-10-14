@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react';
 import { Link, useNavigate, useSearchParams, type LinkProps } from 'react-router-dom';
+import ChecklistEntryCard from '../components/ChecklistEntryCard';
 import ConfirmCard from '../components/ConfirmCard';
 import CompanionLine from '../components/CompanionLine';
 import PetAvatar from '../components/PetAvatar';
@@ -8,6 +9,7 @@ import UndoNotice from '../components/UndoNotice';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
+import { CHECKLIST_TEXT } from '../lib/checklistText';
 import { PRIVACY_TEXT } from '../lib/privacyText';
 import { HISTORY_TEXT } from '../lib/historyText';
 import { bigDoseButtonLabel, PUSH_ACTION_TEXT } from '../lib/pushActionText';
@@ -1003,6 +1005,17 @@ export default function TodayPage() {
                   {TODO_TEXT.entryButton}
                 </GuardLink>
               </section>
+
+              <ChecklistEntryCard profileType={pet?.profileType}>
+                <GuardLink
+                  guard={guardLeave}
+                  to="/checklist"
+                  className="btn-secondary link-button"
+                  aria-label={CHECKLIST_TEXT.entryButtonLabel}
+                >
+                  {CHECKLIST_TEXT.entryButton}
+                </GuardLink>
+              </ChecklistEntryCard>
 
               <p className="disclaimer">{DISCLAIMER}</p>
             </div>

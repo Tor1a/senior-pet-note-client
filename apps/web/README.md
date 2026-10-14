@@ -191,9 +191,21 @@ src/
 - 테스트: 시니어·유형 미선택 헤더 `outerHTML` 이 companion 유무와 상관없이 동일함을 `TodayPage.test.tsx` 에서 고정. 웹 79파일 920개, `npm run build` 성공, `grep -c fake-indexeddb dist/sw.js` = 0. spn.* 저장 키 변경 없음.
 - 확인하지 못한 것: 실서버 연동(백엔드 `docs/api-companion.md` 가 아직 없어 기획서 계약으로 작성), 실제 브라우저의 글자 확대·스크린리더 낭독.
 
+## 처음 키워요 체크리스트 — 온보딩 F단계 (2026-10-14, 커밋 전)
+
+기획 `.company/plans/초보-견주-온보딩-F.md`, 설계 `.company/design/초보-견주-온보딩-F.md`. 웹만 구현(모바일 아직). 백엔드 변경·새 의존성·`package.json` 변경 없음.
+- 오늘 화면 맨 아래(`내 할 일` 카드 아래, 면책 위)에 진입 카드 `처음 키워요 체크리스트` + 버튼 `열기`(`components/ChecklistEntryCard.tsx`). `pet.profileType === 'first_time'` 일 때만 그리고 senior·null·로딩이면 DOM 이 없다.
+- `/checklist`(`pages/ChecklistPage.tsx`, `PetGate need="ready"`): 탭 2개(`준비물`/`병원에 물어볼 질문`, 항상 준비물부터), 체크 행(`label`+네이티브 체크박스, `체크함`/`체크 안 함` 글자 병기), 상단 고정 문구, 저장 안내, 하단 `DISCLAIMER`. 진행률·완료 문구·`aria-live` 없음. 직접 주소 접근은 유형과 무관하게 열림(Q-F2 기본값).
+- 항목: 종(`species`)에 따라 공통 + 종별. 한 종 기준 준비물 10·질문 8, 항목 id 25자 이내. 콘텐츠는 **검수 전 초안**(수의사 검수 전 출시 금지).
+- 저장: 키 `spn.checklist` 하나, 값 `{"v":1,"p":{"<petId>":["prep.water_bowl"]}}`(id 만). localStorage 접근은 모두 try/catch, 손상 값은 빈 상태, 모르는 id 는 버림. 서버 전송 0. 로그아웃은 유지, 탈퇴(`clearLocalAppData`)에서만 삭제(Q-F3 기본값).
+- 글자 확대: `.checklist-page` `word-break: keep-all`, `.checklist-tabs`·`.checklist-row` container query(탭 세로 쌓기 20rem, 상태 글자 아래 줄 22rem). 100% 모양 불변.
+- 공유 lib(모바일이 복사할 대상, 3줄 헤더 패턴): `checklistContent.ts`, `checklistState.ts`, `checklistText.ts`(`findChecklistForbidden`) + 각 테스트. `checklistStorage.ts` 는 웹 전용(모바일은 `services/` 에서 SecureStore 로 따로).
+- 테스트: 웹 83파일 959개(F 추가 32), `npm run build` 성공, `tsc --noEmit` 통과, `grep -c fake-indexeddb dist/sw.js` = 0. 금지어 추가분(2-6 제안분)은 오탐 없이 전 문구 통과.
+- 확인하지 못한 것: 실제 브라우저의 container query·글자 200%·스크린리더 낭독, 수의사 검수, 처리방침 서술(Q-F5).
+
 ## 테스트
 
-`npm test` — 52개 파일, 643개 (2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA·반려동물 폼 추출 포함. 아래 목록은 초기 6개 파일 내역).
+`npm test` — 83개 파일, 959개 (2026-10-14 기준, 온보딩 C·E·F 포함. 이전 52개 파일 643개는 2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA·반려동물 폼 추출 포함. 아래 목록은 초기 6개 파일 내역).
 
 - `pages/TodayPage.test.tsx` (14): 계약서 예시 JSON 으로 fetch 를 가짜로 바꿔 화면을 검사한다.
   제안값 점선 표시와 저장 시 확정, 저장 본문이 계약 8개 필드와 일치, 저장된 기록은 실선, 체중 저장 조건, 첫 사용 상태,

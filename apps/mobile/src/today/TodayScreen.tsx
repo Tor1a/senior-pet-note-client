@@ -5,6 +5,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, AppState, findNodeHandle, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions, type TextInput } from 'react-native';
+import { ChecklistEntryCard } from '../checklist/ChecklistEntryCard';
 import { UndoNotice } from '../components/UndoNotice';
 import { AppButton, AppText, Card, Screen } from '../components/ui';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
@@ -841,6 +842,8 @@ export default function TodayScreen() {
             </Card>
 
             <TodayTodoCard />
+
+            <ChecklistEntryCard profileType={pet?.profileType} />
 
             <AppText variant="caption">{DISCLAIMER}</AppText>
           </View>

@@ -162,7 +162,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 테스트 결과(2026-10-13): 82스위트 999개 통과(기준선 77/948). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독, Android liveRegion)와 실제 서버 연동은 확인하지 못했다. 처리방침 수집 항목 갱신은 대표님 승인·법무 검토 필요.
 
 ## 반려동물 유형·생일·입양일 — 온보딩 C단계 (2026-10-13, 커밋 전)
-기획 `.company/plans/초보-견주-온보딩-C-E-F.md` 2장, 설계 `.company/design/초보-견주-온보딩-C.md`, 계약 백엔드 `docs/api-pet-profile.md`. 웹과 같은 기능이고 **새 네이티브 모듈·`package.json` 변경이 없다(개발 빌드 재생성 불필요).** E·F 는 아직 없다.
+기획 `.company/plans/초보-견주-온보딩-C-E-F.md` 2장, 설계 `.company/design/초보-견주-온보딩-C.md`, 계약 백엔드 `docs/api-pet-profile.md`. 웹과 같은 기능이고 **새 네이티브 모듈·`package.json` 변경이 없다(개발 빌드 재생성 불필요).** E·F(처음 키워요 체크리스트)는 아래 별도 절.
 - 화면: `src/pet/PetFormScreen.tsx`(등록·수정 공통). 종류 아래 `함께 지내는 상황 (선택)` 라디오 3개(`처음 키워요`/`나이 든 아이예요`/`나중에 정할게요`, 기본 = 나중에 = `profileType` null), 태어난 해 아래 접힌 행 `날짜 자세히 적기 (선택)`(생일 월·일, 입양일 연·월·일). 저장된 날짜가 있으면 열린 채 시작하고, 저장할 때 오류가 안에 있으면 펼친 뒤 첫 오류 칸으로 스크롤·포커스한다. 접었을 때 값이 있으면 요약 한 줄(`생일 10월 13일 · 입양 2024년 3월 2일`).
 - 시트: `src/pet/OptionSheet.tsx`(YearSheet 패턴을 일반화한 목록 시트 + `PickField` 칸). `YearSheet` 는 이를 부르는 얇은 래퍼. 줄을 눌러도 [완료]에서 반영, 월은 1~12월, 일은 고른 해·월의 말일까지, 입양 연도는 올해부터 1980년(처음 위치는 올해). 선택 뒤 `{n}월로 정했어요` 등을 읽어 준다.
 - 칸 연동: 태어난 해를 바꿔 없는 날(2/29)이 되면 일만 비우고 안내, 태어난 해를 지우면 생일 월·일도 비우고 안내(`changeBirthYear` 등, 공유 사본).
@@ -179,6 +179,14 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 유형을 바꾼 뒤 반영: 수정 화면은 오늘 화면 위에 쌓이고(오늘 화면이 살아 있음) 저장 후 `dismissTo` 로 돌아온다. 기존에는 돌아올 때 `syncDoses` 가 투약만 다시 읽어 `companion` 이 갱신되지 않았다. 그래서 `TodayScreen` 에 `companion` 상태를 두고 `load`/`applyToday`, 포커스 복귀 `syncDoses`, 같은 날짜 앱 복귀 재확인에서 서버 값으로 맞춘다(first_time 으로 바꾸면 돌아오자마자 줄이 보이고, senior 로 바꾸면 `profileType` 검사로 즉시 숨는다). 새 요청은 없다(기존 `/today` 재조회에 얹음).
 - 공유 사본(웹과 헤더 3줄 외 동일): 신규 `lib/companionText.ts`(+`companionText.test.ts`, 테스트는 vitest import 한 줄과 `expect` 메시지 인자 2곳만 다름), 수정 `lib/petApi.ts`(`Companion` 타입, `TodayResponse.companion?`). `withParticle`(`format.ts`)·`findForbidden`(`historyText.ts`)은 모바일에 이미 사본이 있다. 클라이언트에 날짜 계산 없음.
 - 테스트 결과(2026-10-14): 타입체크 오류 없음, 90스위트 1105개 통과(기준선 87/1068, 신규 3스위트 37개). 웹 79파일 920개·빌드 성공. 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독)와 실제 서버 연동은 확인하지 못했다.
+
+## 처음 키워요 체크리스트 — 온보딩 F단계 (2026-10-14, 커밋 전)
+기획 `.company/plans/초보-견주-온보딩-F.md`, 설계 `.company/design/초보-견주-온보딩-F.md`. 웹과 같은 기능이고 **새 네이티브 모듈·`package.json`·`app.config.ts` 변경이 없다(개발 빌드 재생성 불필요).**
+- 진입 카드: `src/checklist/ChecklistEntryCard.tsx` 를 `TodayScreen` 의 `TodayTodoCard` 아래·면책 위에 둔다. `pet.profileType === 'first_time'` 일 때만 그리고(senior·null·로딩이면 아무것도 없음) 버튼 접근성 이름은 `처음 키워요 체크리스트 열기`. 체크 상태는 읽지 않는다.
+- 화면: `app/checklist.tsx`(`PetGate` 안, 오류·없음은 기존 PetGate 가 처리) -> `src/checklist/ChecklistScreen.tsx`. 위에서부터 뒤로·제목·고정 문구·저장 안내·탭 2개(`tablist`/`tab`+`selected`)·체크 행·면책. 체크 행은 `Pressable` `accessibilityRole="checkbox"`+`accessibilityState.checked`, 최소 높이 56(질문 탭 64), 상태 글자(`체크함`/`체크 안 함`)를 항상 표시. `fontScale >= 1.3`(`isLargeFont`)이면 탭을 세로로 쌓고 상태 글자를 본문 아래로. `numberOfLines`·라이브 영역 없음. 탭 선택은 저장하지 않는다.
+- 저장: `src/services/checklistStorage.ts`, secure-store 키 `spn.checklist` 하나(`{"v":1,"p":{"<petId>":[id...]}}`, 체크된 id 만). 읽기·쓰기 실패는 조용히 무시, 웹 플랫폼은 메모리만. `LOCAL_PREFERENCE_KEYS` 에 추가돼 회원 탈퇴 때 지워진다(로그아웃에는 유지).
+- 공유 사본(웹과 헤더 3줄 외 동일): `lib/checklistContent.ts`·`checklistState.ts`·`checklistText.ts`(+`checklistContent.test.ts`, `checklistText.test.ts`: vitest import 한 줄과 `expect` 메시지 인자만 다름. `checklistState.test.ts` 는 웹의 순수 로직 블록만). 저장소 접근은 모바일 전용 `services/checklistStorage.ts`.
+- 테스트 결과(2026-10-14): 타입체크 오류 없음, 95스위트 1141개 통과(기준선 90/1105, 신규 5스위트 36개). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독)·실제 서버 연동은 확인하지 못했다. 항목 문구는 수의사 검수 전 초안(검수 전 출시 금지).
 
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).

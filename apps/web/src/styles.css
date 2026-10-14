@@ -408,3 +408,25 @@ input[type='date'] { min-height: 3rem; font-size: 1.1rem; }
 @container (max-width: 15rem) { .levels { flex-direction: column; } .stepper { flex-wrap: wrap; } .unit-input { min-width: 0; max-width: 100%; } .unit-input input { min-width: 0; } }
 input[type='time'], input[type='date'] { max-width: 100%; min-width: 0; }
 fieldset { min-width: 0; }
+
+/* ---------- 처음 키워요 체크리스트 (.company/design/초보-견주-온보딩-F.md 4~7장) ---------- */
+/* 새 색 없음(체크 색은 primary, 초록 done 은 쓰지 않는다). 빨강 없음. 고정 높이 없음 */
+.checklist-page { word-break: keep-all; overflow-wrap: anywhere; }
+.checklist-page .back-link { display: inline-flex; align-items: center; min-height: 3rem; color: var(--sub); }
+.checklist-tabs { container-type: inline-size; margin: 0.75rem 0; }
+.checklist-tablist { display: flex; gap: 0.5rem; }
+.checklist-tablist button { flex: 1 1 0; min-height: 3.5rem; background: #fff; color: var(--text); border: 2px solid var(--sub); font-weight: 600; }
+.checklist-tablist button[aria-selected='true'] { background: var(--primary); color: #fff; border-color: var(--primary); font-weight: 700; }
+.checklist-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.checklist-row { container-type: inline-size; }
+.checklist-row label { display: flex; align-items: center; gap: 0.75rem; min-height: 3.5rem; padding: 0.5rem 0.75rem; background: #fff; border: 1px solid #e8dfd4; border-radius: 12px; font-size: 1.125rem; font-weight: 400; line-height: 1.4; }
+.checklist-row label.is-checked { border: 2px solid var(--primary); padding: calc(0.5rem - 1px) calc(0.75rem - 1px); }
+.checklist-row input[type='checkbox'] { width: 1.75rem; height: 1.75rem; flex: none; margin: 0; accent-color: var(--primary); }
+.checklist-text { flex: 1 1 0; min-width: 0; }
+.checklist-row label.is-checked .checklist-text { font-weight: 600; }
+.checklist-state { flex: none; min-width: 5rem; text-align: right; font-size: 1rem; color: var(--sub); }
+.checklist-row label.is-checked .checklist-state { color: var(--text); font-weight: 700; }
+.checklist-list.is-ask .checklist-row label { min-height: 4rem; line-height: 1.6; }
+/* 컨테이너 너비 = 화면폭 - 좌우 여백 2rem. 100% 폰(320~430px)은 18~24rem, 200% 확대는 약 9~12rem 이므로 중간인 15rem 을 경계로 삼는다(설계서 7-1: 100% 는 우측 배치, 200% 만 세로) */
+@container (max-width: 15rem) { .checklist-tablist { flex-direction: column; } }
+@container (max-width: 15rem) { .checklist-row label { display: grid; grid-template-columns: 1.75rem 1fr; align-items: start; } .checklist-row .checklist-state { grid-column: 2; min-width: 0; text-align: left; white-space: normal; } }

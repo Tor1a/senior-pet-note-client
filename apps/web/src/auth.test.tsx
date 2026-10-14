@@ -35,12 +35,15 @@ function mockServer(deleteDevice: () => Promise<Response> | Response) {
 }
 
 function Probe() {
-  const { status, logout } = useAuth();
+  const { status, logout, finishWithdrawal } = useAuth();
   return (
     <>
       <p data-testid="status">{status}</p>
       <button type="button" onClick={() => void logout()}>
         로그아웃
+      </button>
+      <button type="button" onClick={() => void finishWithdrawal()}>
+        탈퇴완료
       </button>
     </>
   );
@@ -103,5 +106,28 @@ describe('로그아웃 — 이 기기 알림 해제', () => {
     await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('signedOut'));
     await waitFor(() => expect(localStorage.getItem(PUSH_DEVICE_ID_KEY)).toBeNull());
     expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+  });
+
+  it('logout 후에도 이 기기의 spn.checklist 는 남는다', async () => {
+    setToken('test-token');
+    const saved = JSON.stringify({ v: 1, p: { 'pet-1': ['prep.water_bowl'] } });
+    localStorage.setItem('spn.checklist', saved);
+    mockServer(() => new Response(null, { status: 204 }));
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('signedIn'));
+    await userEvent.setup().click(screen.getByRole('button', { name: '로그아웃' }));
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('signedOut'));
+    expect(localStorage.getItem('spn.checklist')).toBe(saved);
+  });
+
+  it('finishWithdrawal 후에는 spn.checklist 가 삭제된다', async () => {
+    setToken('test-token');
+    localStorage.setItem('spn.checklist', JSON.stringify({ v: 1, p: { 'pet-1': ['prep.water_bowl'] } }));
+    mockServer(() => new Response(null, { status: 204 }));
+    renderAuth();
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('signedIn'));
+    await userEvent.setup().click(screen.getByRole('button', { name: '탈퇴완료' }));
+    await waitFor(() => expect(screen.getByTestId('status').textContent).toBe('signedOut'));
+    expect(localStorage.getItem('spn.checklist')).toBeNull();
   });
 });

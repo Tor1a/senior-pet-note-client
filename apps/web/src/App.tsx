@@ -11,6 +11,7 @@ import ReminderPage from './pages/ReminderPage';
 import HistoryPage from './pages/HistoryPage';
 import HistoryDayPage from './pages/HistoryDayPage';
 import ReportPage from './pages/ReportPage';
+import ChecklistPage from './pages/ChecklistPage';
 import TodosPage from './pages/TodosPage';
 import TodoFormPage from './pages/TodoFormPage';
 import AccountPage from './pages/AccountPage';
@@ -31,6 +32,7 @@ import ServerDownPage from './pages/ServerDownPage';
 //   /report      : 병원 방문 리포트(7/14/30일, 인쇄). ?range=7|14|30&from=history
 //   /todos       : 내 할 일 일정 목록(예정/완료). 알림을 눌러 열면 ?source=push
 //   /todos/new, /todos/:id : 할 일 추가 · 보기·고치기(병원 메모)
+//   /checklist   : 처음 키워요 체크리스트(준비물 · 병원에 물어볼 질문). 체크는 이 기기에만 저장. 진입 카드는 first_time 에게만
 //   /pet         : 프로필 수정(사진 교체·삭제, 로그아웃)
 //   /account, /account/password, /account/delete : 계정 · 비밀번호 바꾸기 · 회원 탈퇴 (반려동물이 없어도 열린다)
 //   /delete-account : 로그인 없이 보는 계정 삭제 안내(공개, Google Play 삭제 요청 링크용). 로그인 가드 밖
@@ -150,6 +152,14 @@ export default function App() {
           element={
             <PetGate need="ready">
               <TodoFormPage />
+            </PetGate>
+          }
+        />
+        <Route
+          path="/checklist"
+          element={
+            <PetGate need="ready">
+              <ChecklistPage />
             </PetGate>
           }
         />

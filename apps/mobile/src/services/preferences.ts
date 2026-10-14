@@ -3,6 +3,7 @@
 // 건강 기록은 저장하지 않는다(민감정보).
 import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
+import { CHECKLIST_STORAGE_KEY } from '../lib/checklistState';
 import { PUSH_DEVICE_ID_KEY, PUSH_TOKEN_KEY } from '../lib/pushDevice';
 
 const WATER_MODE_KEY = 'spn.waterMode';
@@ -27,8 +28,8 @@ export async function writePreferMl(ml: boolean): Promise<void> {
   }
 }
 
-/** 모바일이 secure-store 에 두는 토큰 외 키 전부(물 입력 방식, 푸시 기기 id·FCM 토큰). 토큰은 clearToken 이 지운다 */
-export const LOCAL_PREFERENCE_KEYS = [WATER_MODE_KEY, PUSH_DEVICE_ID_KEY, PUSH_TOKEN_KEY] as const;
+/** 모바일이 secure-store 에 두는 토큰 외 키 전부(물 입력 방식, 푸시 기기 id·FCM 토큰, 처음 키워요 체크리스트 체크). 토큰은 clearToken 이 지운다 */
+export const LOCAL_PREFERENCE_KEYS = [WATER_MODE_KEY, PUSH_DEVICE_ID_KEY, PUSH_TOKEN_KEY, CHECKLIST_STORAGE_KEY] as const;
 
 /** 탈퇴 뒤 기기에 남은 설정·기기 정보를 모두 지운다(하나가 실패해도 나머지는 지운다) */
 export async function clearPreferences(): Promise<void> {
