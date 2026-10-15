@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { COMPANION_TEXT, companionLines, companionTexts, findCompanionForbidden } from './companionText';
+import {
+  COMPANION_TEXT,
+  companionLines,
+  companionTexts,
+  findCompanionForbidden,
+  withoutRecordingDays,
+} from './companionText';
 
 describe('companionLines', () => {
   it('first_time + 두 값: 함께한 줄 → 기록 줄', () => {
@@ -71,5 +77,18 @@ describe('문구 금지어', () => {
       expect(findCompanionForbidden(w), w).not.toBeNull();
     }
     expect(findCompanionForbidden('기록을 시작한 지 3일째')).toBeNull();
+  });
+});
+
+describe('withoutRecordingDays', () => {
+  it('recordingDays 만 비우고 나머지는 그대로', () => {
+    const c = { togetherDays: 7, recordingDays: 3 };
+    expect(withoutRecordingDays(c)).toEqual({ togetherDays: 7, recordingDays: null });
+    expect(c.recordingDays).toBe(3); // 원본 불변
+    expect(companionLines(withoutRecordingDays(c), '보리', 'first_time')).toEqual(['보리와 함께한 지 7일째']);
+  });
+  it('null/undefined 는 그대로', () => {
+    expect(withoutRecordingDays(null)).toBeNull();
+    expect(withoutRecordingDays(undefined)).toBeUndefined();
   });
 });

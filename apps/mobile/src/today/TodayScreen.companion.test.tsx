@@ -73,6 +73,40 @@ describe('오늘 화면 — 함께한 날 줄', () => {
     expect(await screen.findByLabelText('보리와 함께한 지 120일째, 기록을 시작한 지 45일째')).toBeTruthy();
   });
 
+  it('recordingDays null(기록 없음): 기록 줄 없이 함께한 줄만', async () => {
+    companionBody = { togetherDays: 120, recordingDays: null };
+    setup();
+    await renderToday(FIRST);
+    expect(await screen.findByLabelText('보리와 함께한 지 120일째')).toBeTruthy();
+    expect(screen.queryByText(/기록을 시작한 지/)).toBeNull();
+  });
+
+  it('둘 다 null 이면 아무 줄도 없다', async () => {
+    companionBody = { togetherDays: null, recordingDays: null };
+    setup();
+    await renderToday(FIRST);
+    expect(screen.queryByText(/일째/)).toBeNull();
+  });
+
+  it('첫 기록 환영 카드가 보이는 동안은 기록 줄을 숨기고 함께한 줄은 그대로', async () => {
+    global.fetch = jest.fn(async (url: string) => {
+      if (String(url).endsWith('/today')) {
+        return json(200, {
+          ...todayExample({
+            suggestions: { foodLevel: null, waterLevel: null, waterMl: null, weightKg: null },
+            lastWeight: null,
+          }),
+          companion: { togetherDays: 120, recordingDays: 45 },
+        });
+      }
+      return json(404, { code: 'NOT_FOUND', message: 'x' });
+    }) as never;
+    await renderToday(FIRST);
+    expect(await screen.findByText(/첫 기록을 시작해 볼까요/)).toBeTruthy();
+    expect(screen.getByLabelText('보리와 함께한 지 120일째')).toBeTruthy();
+    expect(screen.queryByText(/기록을 시작한 지/)).toBeNull();
+  });
+
   it('로딩 중에는 줄이 없다(임시 숫자 없음)', async () => {
     global.fetch = jest.fn(() => new Promise(() => {})) as never;
     await render(ui(FIRST));

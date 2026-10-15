@@ -190,6 +190,7 @@ src/
 - 공유 lib(모바일이 복사할 대상): `companionText.ts`(`COMPANION_TEXT`·`companionLines`·`companionTexts`·`findCompanionForbidden`) + `petApi.ts` 의 `Companion`·`TodayResponse.companion` 수정분. 금지어 검사는 문구 상수 샘플 출력 전체에 건다(`일째`는 허용).
 - 테스트: 시니어·유형 미선택 헤더 `outerHTML` 이 companion 유무와 상관없이 동일함을 `TodayPage.test.tsx` 에서 고정. 웹 79파일 920개, `npm run build` 성공, `grep -c fake-indexeddb dist/sw.js` = 0. spn.* 저장 키 변경 없음.
 - 확인하지 못한 것: 실서버 연동(백엔드 `docs/api-companion.md` 가 아직 없어 기획서 계약으로 작성), 실제 브라우저의 글자 확대·스크린리더 낭독.
+- **기록 줄 기준 변경(2026-10-15, 대표님 결정, 커밋 전):** `recordingDays` 는 등록일이 아니라 **첫 기록일** 기준이고 기록이 아직 없으면 `null`(타입 `number | null`, 백엔드 `docs/api-companion.md` 갱신). `null` 이면 기록 줄을 그리지 않고 두 줄 모두 없으면 컴포넌트가 아무것도 그리지 않는다. 첫 기록 환영 카드(`isFirstUse`)가 보이는 동안에도 기록 줄을 숨긴다(`TodayPage`/`TodayScreen` 이 `companionText.withoutRecordingDays` 로 `recordingDays` 만 비워 넘김, 함께한 줄은 그대로). 첫 기록을 저장하면 `today` 를 한 번 다시 받아 `companion` 만 갱신해 기록 줄이 나타난다(실패하면 다음 불러오기 때). 되돌리기로 기록이 사라져 환영 카드가 다시 보이면 줄도 다시 숨겨진다. 사본 `companionText.ts` 웹·모바일 동일. 웹 83파일 965개(기준 959, +6), `tsc --noEmit`·`npm run build` 통과, `grep -c fake-indexeddb dist/sw.js` = 0. 실서버·실브라우저 미확인.
 
 ## 처음 키워요 체크리스트 — 온보딩 F단계 (2026-10-14, 커밋 전)
 

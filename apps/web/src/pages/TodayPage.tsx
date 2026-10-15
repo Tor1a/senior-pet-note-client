@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams, type LinkProps } from 'react-router
 import ChecklistEntryCard from '../components/ChecklistEntryCard';
 import ConfirmCard from '../components/ConfirmCard';
 import CompanionLine from '../components/CompanionLine';
+import { withoutRecordingDays } from '../lib/companionText';
 import PetAvatar from '../components/PetAvatar';
 import RoutineSection from '../components/RoutineSection';
 import UndoNotice from '../components/UndoNotice';
@@ -474,6 +475,15 @@ export default function TodayPage() {
       setToday(next);
       setSavedLog(log);
       setForm(initialTodayForm(next, form.waterMode === 'ml'));
+      if (wasFirst) {
+        // 첫 기록이 생겼으니 기록 줄에 쓸 값(첫 기록일 기준)을 서버에서 다시 받는다. 실패해도 다음 불러오기 때 채워진다
+        void petApi
+          .getToday(petId)
+          .then((t) =>
+            setToday((prev) => (prev && prev.recordDate === t.recordDate ? { ...prev, companion: t.companion } : prev)),
+          )
+          .catch(() => {});
+      }
       setDailyNotice({
         kind: 'offer',
         message: wasFirst ? UNDO_TEXT.dailyFirstSaved : before ? UNDO_TEXT.dailyEdited : UNDO_TEXT.dailySaved,
@@ -649,7 +659,11 @@ export default function TodayPage() {
           <PetAvatar pet={pet} size={40} />
           <span>{headerInfo}</span>
         </div>
-        <CompanionLine companion={today?.companion} name={pet?.name ?? ''} profileType={pet?.profileType} />
+        <CompanionLine
+          companion={firstUse ? withoutRecordingDays(today?.companion) : today?.companion}
+          name={pet?.name ?? ''}
+          profileType={pet?.profileType}
+        />
       </header>
 
       <main className="page today-main">

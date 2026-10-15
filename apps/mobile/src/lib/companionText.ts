@@ -21,6 +21,7 @@ export function isUsableDays(n: unknown): n is number {
 /**
  * 화면에 그릴 문장 0~2개(함께한 줄 → 기록 줄). 그리는 조건:
  * companion 이 있고 profileType 이 first_time 일 때만. 숫자는 줄마다 1 이상 정수일 때만.
+ * recordingDays 는 첫 기록일 기준이라 기록이 없으면 null(기록 줄 없음).
  */
 export function companionLines(
   companion: Companion | null | undefined,
@@ -32,6 +33,14 @@ export function companionLines(
   if (name && isUsableDays(companion.togetherDays)) lines.push(COMPANION_TEXT.together(name, companion.togetherDays));
   if (isUsableDays(companion.recordingDays)) lines.push(COMPANION_TEXT.recording(companion.recordingDays));
   return lines;
+}
+
+/**
+ * 첫 기록 전 환영 카드가 보이는 동안은 기록 줄을 숨긴다(환영 카드 조건 isFirstUse 와 같은 때).
+ * recordingDays 만 비우고 함께한 줄은 그대로 둔다.
+ */
+export function withoutRecordingDays(companion: Companion | null | undefined): Companion | null | undefined {
+  return companion ? { ...companion, recordingDays: null } : companion;
 }
 
 /** 금지어 검사용: 함수형 문구의 샘플 출력 (숫자·이름 경계 포함) */

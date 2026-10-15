@@ -777,6 +777,36 @@ describe('오늘 화면 — 함께한 날 · 기록 N일째 (온보딩 E단계)'
     expect(screen.queryByText(/함께한 지/)).toBeNull();
   });
 
+  it('recordingDays null(기록 없음): 기록 줄을 그리지 않는다', async () => {
+    renderWith(FIRST, todayExample({ companion: { togetherDays: 120, recordingDays: null } }));
+    expect(await screen.findByText('보리와 함께한 지 120일째')).toBeTruthy();
+    expect(screen.queryByText(/기록을 시작한 지/)).toBeNull();
+  });
+
+  it('둘 다 null 이면 companion-line 컨테이너도 없다', async () => {
+    const { container } = renderWith(FIRST, todayExample({ companion: { togetherDays: null, recordingDays: null } }));
+    await screen.findByText('10월 6일 (화)');
+    expect(container.querySelector('.companion-line')).toBeNull();
+  });
+
+  const EMPTY = {
+    suggestions: { foodLevel: null, waterLevel: null, waterMl: null, weightKg: null },
+    lastWeight: null,
+  };
+
+  it('첫 기록 환영 카드가 보이는 동안은 기록 줄을 숨기고 함께한 줄은 그대로', async () => {
+    renderWith(FIRST, todayExample({ ...EMPTY, companion: { togetherDays: 120, recordingDays: 45 } }));
+    expect(await screen.findByText(/첫 기록을 시작해 볼까요/)).toBeTruthy();
+    expect(screen.getByText('보리와 함께한 지 120일째')).toBeTruthy();
+    expect(screen.queryByText(/기록을 시작한 지/)).toBeNull();
+  });
+
+  it('환영 카드가 없으면(기록·제안 있음) 기록 줄이 보인다', async () => {
+    renderWith(FIRST, todayExample({ companion: { togetherDays: null, recordingDays: 3 } }));
+    expect(await screen.findByText('기록을 시작한 지 3일째')).toBeTruthy();
+    expect(screen.queryByText(/첫 기록을 시작해 볼까요/)).toBeNull();
+  });
+
   it('로딩 중과 불러오기 오류 때는 아무것도 그리지 않는다', async () => {
     mockServer({ 'GET /api/pets/pet-1/today': () => json(500, { code: 'X', message: 'x' }) });
     const { container } = render(

@@ -1,7 +1,13 @@
 // [공유 로직 테스트 사본] 원본: web/src/lib/companionText.test.ts (2026-10-14 복사)
 // 웹 원본에서 첫 줄 `import ... from 'vitest'` 한 줄을 제거하고 expect(값, 메시지) 의 메시지 인자 2곳을 뺐다(jest 타입에 없음). 나머지 본문은 동일하다.
 // 웹 원본을 고치면 이 사본도 같이 고친다. 추후 packages/shared 로 통합 예정.
-import { COMPANION_TEXT, companionLines, companionTexts, findCompanionForbidden } from './companionText';
+import {
+  COMPANION_TEXT,
+  companionLines,
+  companionTexts,
+  findCompanionForbidden,
+  withoutRecordingDays,
+} from './companionText';
 
 describe('companionLines', () => {
   it('first_time + 두 값: 함께한 줄 → 기록 줄', () => {
@@ -73,5 +79,18 @@ describe('문구 금지어', () => {
       expect(findCompanionForbidden(w)).not.toBeNull();
     }
     expect(findCompanionForbidden('기록을 시작한 지 3일째')).toBeNull();
+  });
+});
+
+describe('withoutRecordingDays', () => {
+  it('recordingDays 만 비우고 나머지는 그대로', () => {
+    const c = { togetherDays: 7, recordingDays: 3 };
+    expect(withoutRecordingDays(c)).toEqual({ togetherDays: 7, recordingDays: null });
+    expect(c.recordingDays).toBe(3); // 원본 불변
+    expect(companionLines(withoutRecordingDays(c), '보리', 'first_time')).toEqual(['보리와 함께한 지 7일째']);
+  });
+  it('null/undefined 는 그대로', () => {
+    expect(withoutRecordingDays(null)).toBeNull();
+    expect(withoutRecordingDays(undefined)).toBeUndefined();
   });
 });

@@ -9,6 +9,7 @@ import { ChecklistEntryCard } from '../checklist/ChecklistEntryCard';
 import { UndoNotice } from '../components/UndoNotice';
 import { AppButton, AppText, Card, Screen } from '../components/ui';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
+import { withoutRecordingDays } from '../lib/companionText';
 import { DISCLAIMER } from '../lib/constants';
 import { daysBetween, formatRecordDate, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
@@ -489,6 +490,15 @@ export default function TodayScreen() {
       setToday(next);
       setSavedLog(log);
       setForm(initialTodayForm(next, form.waterMode === 'ml'));
+      if (wasFirst) {
+        // 첫 기록이 생겼으니 기록 줄에 쓸 값(첫 기록일 기준)을 서버에서 다시 받는다. 실패해도 다음 불러오기 때 채워진다
+        void petApi
+          .getToday(petId)
+          .then((t) => {
+            if (todayRef.current?.recordDate === t.recordDate) setCompanion(t.companion ?? null);
+          })
+          .catch(() => {});
+      }
       setDailyNotice({
         kind: 'offer',
         message: wasFirst ? UNDO_TEXT.dailyFirstSaved : before ? UNDO_TEXT.dailyEdited : UNDO_TEXT.dailySaved,
@@ -688,7 +698,7 @@ export default function TodayScreen() {
         dateText={today ? formatRecordDate(today.recordDate) : '오늘'}
         petName={name}
         info={buildHeaderInfo(pet, today)}
-        companion={today ? companion : null}
+        companion={today ? (firstUse ? withoutRecordingDays(companion) : companion) : null}
         profileType={pet?.profileType}
       />
 
