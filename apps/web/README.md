@@ -190,7 +190,7 @@ src/
 - 공유 lib(모바일이 복사할 대상): `companionText.ts`(`COMPANION_TEXT`·`companionLines`·`companionTexts`·`findCompanionForbidden`) + `petApi.ts` 의 `Companion`·`TodayResponse.companion` 수정분. 금지어 검사는 문구 상수 샘플 출력 전체에 건다(`일째`는 허용).
 - 테스트: 시니어·유형 미선택 헤더 `outerHTML` 이 companion 유무와 상관없이 동일함을 `TodayPage.test.tsx` 에서 고정. 웹 79파일 920개, `npm run build` 성공, `grep -c fake-indexeddb dist/sw.js` = 0. spn.* 저장 키 변경 없음.
 - 확인하지 못한 것: 실서버 연동(백엔드 `docs/api-companion.md` 가 아직 없어 기획서 계약으로 작성), 실제 브라우저의 글자 확대·스크린리더 낭독.
-- **기록 줄 기준 변경(2026-10-15, 대표님 결정, 커밋 전):** `recordingDays` 는 등록일이 아니라 **첫 기록일** 기준이고 기록이 아직 없으면 `null`(타입 `number | null`, 백엔드 `docs/api-companion.md` 갱신). `null` 이면 기록 줄을 그리지 않고 두 줄 모두 없으면 컴포넌트가 아무것도 그리지 않는다. 첫 기록 환영 카드(`isFirstUse`)가 보이는 동안에도 기록 줄을 숨긴다(`TodayPage`/`TodayScreen` 이 `companionText.withoutRecordingDays` 로 `recordingDays` 만 비워 넘김, 함께한 줄은 그대로). 첫 기록을 저장하면 `today` 를 한 번 다시 받아 `companion` 만 갱신해 기록 줄이 나타난다(실패하면 다음 불러오기 때). 되돌리기로 기록이 사라져 환영 카드가 다시 보이면 줄도 다시 숨겨진다. 사본 `companionText.ts` 웹·모바일 동일. 웹 83파일 965개(기준 959, +6), `tsc --noEmit`·`npm run build` 통과, `grep -c fake-indexeddb dist/sw.js` = 0. 실서버·실브라우저 미확인.
+- **기록 줄 기준 변경(2026-10-15, 대표님 결정, 커밋 전):** `recordingDays` 는 등록일이 아니라 **첫 기록일** 기준이고 기록이 아직 없으면 `null`(타입 `number | null`, 백엔드 `docs/api-companion.md` 갱신). `null` 이면 기록 줄을 그리지 않고 두 줄 모두 없으면 컴포넌트가 아무것도 그리지 않는다. 첫 기록 환영 카드(`isFirstUse`)가 보이는 동안에도 기록 줄을 숨긴다(`TodayPage`/`TodayScreen` 이 `companionText.withoutRecordingDays` 로 `recordingDays` 만 비워 넘김, 함께한 줄은 그대로). 첫 기록을 저장하면 `today` 를 한 번 다시 받아 `companion` 만 갱신해 기록 줄이 나타난다(실패하면 다음 불러오기 때). 되돌리기로 기록이 사라져 환영 카드가 다시 보이면 줄도 다시 숨겨진다. 사본 `companionText.ts` 웹·모바일 동일. (당시 기준) 웹 83파일 965개(기준 959, +6), `tsc --noEmit`·`npm run build` 통과, `grep -c fake-indexeddb dist/sw.js` = 0. 실서버·실브라우저 미확인.
 
 ## 처음 키워요 체크리스트 — 온보딩 F단계 (2026-10-14, 커밋 전)
 
@@ -201,12 +201,13 @@ src/
 - 저장: 키 `spn.checklist` 하나, 값 `{"v":1,"p":{"<petId>":["prep.water_bowl"]}}`(id 만). localStorage 접근은 모두 try/catch, 손상 값은 빈 상태, 모르는 id 는 버림. 서버 전송 0. 로그아웃은 유지, 탈퇴(`clearLocalAppData`)에서만 삭제(Q-F3 기본값).
 - 글자 확대: `.checklist-page` `word-break: keep-all`, `.checklist-tabs`·`.checklist-row` container query(탭 세로 쌓기 20rem, 상태 글자 아래 줄 22rem). 100% 모양 불변.
 - 공유 lib(모바일이 복사할 대상, 3줄 헤더 패턴): `checklistContent.ts`, `checklistState.ts`, `checklistText.ts`(`findChecklistForbidden`) + 각 테스트. `checklistStorage.ts` 는 웹 전용(모바일은 `services/` 에서 SecureStore 로 따로).
-- 테스트: 웹 83파일 959개(F 추가 32), `npm run build` 성공, `tsc --noEmit` 통과, `grep -c fake-indexeddb dist/sw.js` = 0. 금지어 추가분(2-6 제안분)은 오탐 없이 전 문구 통과.
+- **최근 7일 돌아보기 카드(2026-10-15, 커밋 전):** 오늘 화면 `RoutineSection` 아래의 접이식 카드 `components/WeekReviewCard`. 기본 접힘, 펼칠 때만 `getHistory(petId)` 1회(서버 변경·저장 없음), `lib/weekReview.ts`·`lib/weekReviewText.ts`(+테스트, `findWeekReviewForbidden`)는 모바일 사본 대상. 리뷰 수정(반려동물 전환 시 카드 초기화 `key={pet.id}`, 테스트 보강) 후 웹 87파일 1005개, `tsc --noEmit`·`npm run build` 통과, `grep -c fake-indexeddb dist/sw.js` = 0. 실브라우저 미확인.
+- 테스트(2026-10-14 당시 이력, 현재 값은 아래 "테스트" 절): 웹 83파일 959개(F 추가 32), `npm run build` 성공, `tsc --noEmit` 통과, `grep -c fake-indexeddb dist/sw.js` = 0. 금지어 추가분(2-6 제안분)은 오탐 없이 전 문구 통과.
 - 확인하지 못한 것: 실제 브라우저의 container query·글자 200%·스크린리더 낭독, 수의사 검수, 처리방침 서술(Q-F5).
 
 ## 테스트
 
-`npm test` — 83개 파일, 959개 (2026-10-14 기준, 온보딩 C·E·F 포함. 이전 52개 파일 643개는 2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA·반려동물 폼 추출 포함. 아래 목록은 초기 6개 파일 내역).
+`npm test` — 87개 파일, 1005개 (2026-10-15 기준 현재 값, 최근 7일 돌아보기 카드 리뷰 수정 포함. 아래는 이력: 카드 구현 직후 1001개, 직전 83개 파일 965개. 2026-10-14 기준 959개는 온보딩 C·E·F 포함. 이전 52개 파일 643개는 2026-10-12 기준, 저장 되돌리기·알림에서 바로 체크·QA·반려동물 폼 추출 포함. 아래 목록은 초기 6개 파일 내역).
 
 - `pages/TodayPage.test.tsx` (14): 계약서 예시 JSON 으로 fetch 를 가짜로 바꿔 화면을 검사한다.
   제안값 점선 표시와 저장 시 확정, 저장 본문이 계약 8개 필드와 일치, 저장된 기록은 실선, 체중 저장 조건, 첫 사용 상태,

@@ -430,3 +430,17 @@ fieldset { min-width: 0; }
 /* 컨테이너 너비 = 화면폭 - 좌우 여백 2rem. 100% 폰(320~430px)은 18~24rem, 200% 확대는 약 9~12rem 이므로 중간인 15rem 을 경계로 삼는다(설계서 7-1: 100% 는 우측 배치, 200% 만 세로) */
 @container (max-width: 15rem) { .checklist-tablist { flex-direction: column; } }
 @container (max-width: 15rem) { .checklist-row label { display: grid; grid-template-columns: 1.75rem 1fr; align-items: start; } .checklist-row .checklist-state { grid-column: 2; min-width: 0; text-align: left; white-space: normal; } }
+
+/* 최근 7일 돌아보기 카드 (오늘 화면 접이식): 설계 design/최근-7일-돌아보기-카드.md 5·8장. 새 색 없음, 기존 규칙은 건드리지 않는다 */
+.week-review { container-type: inline-size; margin-top: 1rem; word-break: keep-all; overflow-wrap: anywhere; }
+.week-review-toggle { width: 100%; min-height: 3.5rem; background: #fff; color: var(--text); border: 2px solid #b8aa9c; border-radius: 8px; font-size: 1.125rem; font-weight: 700; text-align: left; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.25rem 0.75rem; padding: 0.5rem 0.75rem; touch-action: manipulation; }
+.week-review-state { font-weight: 400; color: var(--sub); }
+.week-review-body { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.5rem; padding: 1rem; background: #fff; border: 1px solid #e8dfd4; border-radius: 12px; }
+.week-review-body[hidden] { display: none; }
+.week-review-body p { margin: 0; font-size: 1.125rem; }
+.week-review-body p.muted { font-size: 1rem; }
+.week-review-body [aria-live] { display: flex; flex-direction: column; gap: 0.5rem; }
+.week-review-retry { width: 100%; min-height: 3.5rem; }
+@container (max-width: 15rem) {
+  .week-review-toggle { flex-direction: column; align-items: flex-start; }
+}

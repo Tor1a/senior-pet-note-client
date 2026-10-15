@@ -179,7 +179,7 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 유형을 바꾼 뒤 반영: 수정 화면은 오늘 화면 위에 쌓이고(오늘 화면이 살아 있음) 저장 후 `dismissTo` 로 돌아온다. 기존에는 돌아올 때 `syncDoses` 가 투약만 다시 읽어 `companion` 이 갱신되지 않았다. 그래서 `TodayScreen` 에 `companion` 상태를 두고 `load`/`applyToday`, 포커스 복귀 `syncDoses`, 같은 날짜 앱 복귀 재확인에서 서버 값으로 맞춘다(first_time 으로 바꾸면 돌아오자마자 줄이 보이고, senior 로 바꾸면 `profileType` 검사로 즉시 숨는다). 새 요청은 없다(기존 `/today` 재조회에 얹음).
 - 공유 사본(웹과 헤더 3줄 외 동일): 신규 `lib/companionText.ts`(+`companionText.test.ts`, 테스트는 vitest import 한 줄과 `expect` 메시지 인자 2곳만 다름), 수정 `lib/petApi.ts`(`Companion` 타입, `TodayResponse.companion?`). `withParticle`(`format.ts`)·`findForbidden`(`historyText.ts`)은 모바일에 이미 사본이 있다. 클라이언트에 날짜 계산 없음.
 - 테스트 결과(2026-10-14): 타입체크 오류 없음, 90스위트 1105개 통과(기준선 87/1068, 신규 3스위트 37개). 웹 79파일 920개·빌드 성공. 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독)와 실제 서버 연동은 확인하지 못했다.
-- **기록 줄 기준 변경(2026-10-15, 대표님 결정, 커밋 전):** `recordingDays` 는 등록일이 아니라 **첫 기록일** 기준이고 기록이 아직 없으면 `null`(타입 `number | null`, 백엔드 `docs/api-companion.md` 갱신). `null` 이면 기록 줄을 그리지 않고 두 줄 모두 없으면 컴포넌트가 아무것도 그리지 않는다. 첫 기록 환영 카드(`isFirstUse`)가 보이는 동안에도 기록 줄을 숨긴다(`TodayPage`/`TodayScreen` 이 `companionText.withoutRecordingDays` 로 `recordingDays` 만 비워 넘김, 함께한 줄은 그대로). 첫 기록을 저장하면 `today` 를 한 번 다시 받아 `companion` 만 갱신해 기록 줄이 나타난다(실패하면 다음 불러오기 때). 되돌리기로 기록이 사라져 환영 카드가 다시 보이면 줄도 다시 숨겨진다. 사본 `companionText.ts` 웹·모바일 동일. 모바일 타입체크 통과, 95스위트 1146개(기준 1141, +5). 실기기·실서버 미확인.
+- **기록 줄 기준 변경(2026-10-15, 대표님 결정, 커밋 전):** `recordingDays` 는 등록일이 아니라 **첫 기록일** 기준이고 기록이 아직 없으면 `null`(타입 `number | null`, 백엔드 `docs/api-companion.md` 갱신). `null` 이면 기록 줄을 그리지 않고 두 줄 모두 없으면 컴포넌트가 아무것도 그리지 않는다. 첫 기록 환영 카드(`isFirstUse`)가 보이는 동안에도 기록 줄을 숨긴다(`TodayPage`/`TodayScreen` 이 `companionText.withoutRecordingDays` 로 `recordingDays` 만 비워 넘김, 함께한 줄은 그대로). 첫 기록을 저장하면 `today` 를 한 번 다시 받아 `companion` 만 갱신해 기록 줄이 나타난다(실패하면 다음 불러오기 때). 되돌리기로 기록이 사라져 환영 카드가 다시 보이면 줄도 다시 숨겨진다. 사본 `companionText.ts` 웹·모바일 동일. (당시 기준) 모바일 타입체크 통과, 95스위트 1146개(기준 1141, +5). 실기기·실서버 미확인.
 
 ## 처음 키워요 체크리스트 — 온보딩 F단계 (2026-10-14, 커밋 전)
 기획 `.company/plans/초보-견주-온보딩-F.md`, 설계 `.company/design/초보-견주-온보딩-F.md`. 웹과 같은 기능이고 **새 네이티브 모듈·`package.json`·`app.config.ts` 변경이 없다(개발 빌드 재생성 불필요).**
@@ -188,6 +188,12 @@ npx expo export --platform web   # 번들 생성 확인 (결과물 dist/ 는 git
 - 저장: `src/services/checklistStorage.ts`, secure-store 키 `spn.checklist` 하나(`{"v":1,"p":{"<petId>":[id...]}}`, 체크된 id 만). 읽기·쓰기 실패는 조용히 무시, 웹 플랫폼은 메모리만. `LOCAL_PREFERENCE_KEYS` 에 추가돼 회원 탈퇴 때 지워진다(로그아웃에는 유지).
 - 공유 사본(웹과 헤더 3줄 외 동일): `lib/checklistContent.ts`·`checklistState.ts`·`checklistText.ts`(+`checklistContent.test.ts`, `checklistText.test.ts`: vitest import 한 줄과 `expect` 메시지 인자만 다름. `checklistState.test.ts` 는 웹의 순수 로직 블록만). 저장소 접근은 모바일 전용 `services/checklistStorage.ts`.
 - 테스트 결과(2026-10-14): 타입체크 오류 없음, 95스위트 1141개 통과(기준선 90/1105, 신규 5스위트 36개). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독)·실제 서버 연동은 확인하지 못했다. 항목 문구는 수의사 검수 전 초안(검수 전 출시 금지).
+
+### 최근 7일 돌아보기 카드 (2026-10-15, 커밋 전)
+- 웹과 같은 기능. `src/today/sections/WeekReviewCard.tsx` 를 `TodayScreen` 의 `RoutineSection` 아래·리포트 `Card` 위에 둔다. 기본 접힘(`accessibilityState.expanded`), **펼칠 때만** 기존 `petApi.getHistory(petId)` 를 인자 없이 1회 요청, 접으면 결과 버림, 펼침 상태·캐시 저장 없음(저장 키·네이티브 모듈 추가 없음). `isFirstUse` 중·반려동물 없음일 때는 그리지 않고, 404 는 접은 뒤 `reloadPet()`.
+- 펼친 본문 맨 아래 `지난 기록 보기 ›` 버튼은 `TodayScreen` 의 기존 `goHistory`(`router.push(HISTORY_HREF)`)를 prop 으로 받는다. 토글 높이 56dp, `fontScale >= 1.3` 이면 상태 글자(펼치기/접기)를 아래 줄로. 사실 영역은 `accessibilityLiveRegion="polite"`, 기간·기록한 날·투약 줄은 `accessibilityLabel` 로 낭독 분리. 아이콘·신규 색 없음.
+- 공유 사본: `lib/weekReview.ts`, `lib/weekReviewText.ts`(+ 테스트, `findWeekReviewForbidden`). 웹 원본을 먼저 고치고 복사한다(헤더 3줄 외 diff 없음. 테스트 사본은 vitest import 제거, 메시지 인자 2곳 제거, `readFileSync` 경로를 `join(__dirname, file)` 로).
+- 테스트 결과(2026-10-15, 리뷰 수정 반영 현재 값): 타입체크 오류 없음, 99스위트 1178개 통과(기준선 95/1146, 신규 4스위트 +30, 리뷰 수정 +2). 실기기(큰 글씨 모양, VoiceOver/TalkBack 낭독·라이브 영역)·실제 서버 연동은 확인하지 못했다.
 
 ## 인증 흐름
 - API 계약: `POST /api/auth/signup`, `POST /api/auth/login`, `GET /api/me` (자세한 내용은 `src/lib/api.ts` 상단 주석).

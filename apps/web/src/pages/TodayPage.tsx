@@ -7,6 +7,7 @@ import { withoutRecordingDays } from '../lib/companionText';
 import PetAvatar from '../components/PetAvatar';
 import RoutineSection from '../components/RoutineSection';
 import UndoNotice from '../components/UndoNotice';
+import WeekReviewCard from '../components/WeekReviewCard';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE, toUserMessage } from '../lib/api';
 import { petApi } from '../lib/client';
 import { DISCLAIMER, MEMO_MAX_LENGTH } from '../lib/constants';
@@ -995,6 +996,8 @@ export default function TodayPage() {
                 saveFailed={saveFailed}
                 saving={saving}
               />
+
+              {pet && !firstUse && <WeekReviewCard key={pet.id} petId={pet.id} onNotFound={() => void reloadPet()} />}
 
               <GuardLink guard={guardLeave} to="/history" className="history-link-row">
                 <span>{HISTORY_TEXT.entryLink}</span>

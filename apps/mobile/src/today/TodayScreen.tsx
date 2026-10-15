@@ -86,6 +86,7 @@ import { SymptomSection } from './sections/SymptomSection';
 import { TodayHeader } from './sections/TodayHeader';
 import { WaterSection } from './sections/WaterSection';
 import { WeightConfirm } from './sections/WeightConfirm';
+import { WeekReviewCard } from './sections/WeekReviewCard';
 import { WeightSection } from './sections/WeightSection';
 
 /** 일일 기록 저장 직후 안내(저장 되돌리기). 되돌리기 정보는 메모리에만 둔다 */
@@ -842,6 +843,8 @@ export default function TodayScreen() {
               saveFailed={saveFailed}
               saving={saving}
             />
+
+            {!firstUse && pet ? <WeekReviewCard key={pet.id} petId={pet.id} onNotFound={reloadPet} onHistory={goHistory} /> : null}
 
             <Card>
               <AppText variant="title" accessibilityRole="header">
