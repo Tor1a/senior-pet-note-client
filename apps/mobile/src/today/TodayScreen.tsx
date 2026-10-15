@@ -63,6 +63,7 @@ import {
 import { doseUndoFailText, doseUndoneText, UNDO_TEXT } from '../lib/undoText';
 import { HISTORY_HREF } from '../history/routes';
 import { TodayTodoCard } from '../todos/TodayTodoCard';
+import { VisitQuestionsLink } from '../visitQuestions/VisitQuestionsLink';
 import { isLargeFont } from '../medications/layout';
 import { REPORT_TEXT } from '../lib/reportText';
 import { REPORT_HREF } from '../report/routes';
@@ -855,6 +856,8 @@ export default function TodayScreen() {
             </Card>
 
             <TodayTodoCard />
+
+            <VisitQuestionsLink />
 
             <ChecklistEntryCard profileType={pet?.profileType} />
 

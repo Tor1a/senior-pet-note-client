@@ -1,4 +1,4 @@
-// [공유 로직 사본] 원본: web/src/lib/api.ts (2026-10-13 복사)
+// [공유 로직 사본] 원본: web/src/lib/api.ts (2026-10-15 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
 // 백엔드(Java, Spring Boot) API 클라이언트
@@ -183,6 +183,7 @@ export type ErrorContext =
   | 'medLog'
   | 'dailyLog'
   | 'todo'
+  | 'visitQuestion'
   | 'password'
   | 'withdraw';
 
@@ -227,6 +228,9 @@ export function toUserMessage(err: unknown, context: ErrorContext = 'general'): 
   if (err.code === 'INVALID_RECORD_DATE') return '기록 날짜가 바뀌었어요. 화면을 새로 불러왔으니 다시 저장해 주세요.';
   if (err.code === 'PET_LIMIT_REACHED') return '반려동물은 한 마리만 등록할 수 있어요.';
   if (err.code === 'TODO_LIMIT_REACHED') return '할 일을 더 등록할 수 없어요. 지난 할 일을 지운 뒤 다시 시도해 주세요.';
+  if (err.code === 'VISIT_QUESTION_LIMIT_REACHED') {
+    return '물어볼 것은 30개까지 적어 둘 수 있어요. 지난 것을 지운 뒤 다시 시도해 주세요.';
+  }
   if (err.code === 'ALREADY_CHECKED') return '이미 체크한 약이에요.';
   if (err.status === 409) {
     return context === 'signup' || context === 'login'
@@ -247,6 +251,8 @@ export function toUserMessage(err: unknown, context: ErrorContext = 'general'): 
         return '새 비밀번호를 사용할 수 없어요. 8자 이상(한글은 24자까지)으로, 지금 쓰는 것과 다르게 다시 정해 주세요.';
       case 'todo':
         return '입력한 내용을 확인해 주세요. 제목은 40자, 일정 메모는 200자, 병원 메모는 500자까지 적을 수 있고, 너무 먼 날짜는 고를 수 없어요.';
+      case 'visitQuestion':
+        return '입력한 내용을 확인해 주세요. 물어볼 것은 1~100자까지 적을 수 있어요.';
       case 'dailyLog':
         return '입력한 내용을 확인해 주세요. 체중은 0보다 크고 200kg보다 작게, 물은 0~20000ml로 적을 수 있어요.';
       default:

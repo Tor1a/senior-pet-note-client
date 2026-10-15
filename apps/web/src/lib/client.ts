@@ -3,6 +3,7 @@ import { createPetApi } from './petApi';
 import { createReminderApi } from './reminderApi';
 import { createAccountApi } from './accountApi';
 import { createTodoApi } from './todoApi';
+import { createVisitQuestionApi } from './visitQuestionApi';
 import { apiConfig, DEFAULT_API_BASE_URL } from './config';
 import { clearToken, getToken } from './tokenStorage';
 
@@ -33,3 +34,6 @@ export const accountApi = createAccountApi(api);
 
 /** 내 할 일 일정 API (계약: 기획서 5장 → docs/api-todos.md) */
 export const todoApi = createTodoApi(api);
+
+/** 진료 때 물어볼 것 메모 API (계약: docs/api-visit-questions.md). 서버 목록은 디스크에 저장하지 않는다 */
+export const visitQuestionApi = createVisitQuestionApi(api);

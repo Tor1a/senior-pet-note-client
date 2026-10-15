@@ -9,6 +9,7 @@ import { createPetApi } from '../lib/petApi';
 import { createReminderApi } from '../lib/reminderApi';
 import { createAccountApi } from '../lib/accountApi';
 import { createTodoApi } from '../lib/todoApi';
+import { createVisitQuestionApi } from '../lib/visitQuestionApi';
 import { resolveApiConfig } from './config';
 import { clearToken, getToken } from './tokenStorage';
 
@@ -45,3 +46,6 @@ export const accountApi = createAccountApi(api);
 
 /** 내 할 일 일정 API (계약: docs/api-todos.md) */
 export const todoApi = createTodoApi(api);
+
+/** 진료 때 물어볼 것 메모 API (계약: docs/api-visit-questions.md). 서버 목록은 디스크에 저장하지 않는다 */
+export const visitQuestionApi = createVisitQuestionApi(api);

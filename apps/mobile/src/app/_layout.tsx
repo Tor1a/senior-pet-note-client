@@ -43,6 +43,7 @@ function RootNavigator() {
         <Stack.Screen name="todos/index" />
         <Stack.Screen name="todos/new" />
         <Stack.Screen name="todos/[id]" />
+        <Stack.Screen name="visit-questions/index" />
         <Stack.Screen name="pet/new" />
         <Stack.Screen name="pet/edit" />
         <Stack.Screen name="account/index" />

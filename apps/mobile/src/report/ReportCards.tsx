@@ -185,12 +185,23 @@ export function ReportCards({
 }
 
 /** 메모 포함 스위치: 켜짐/꺼짐을 색이 아니라 글자로도 알린다 (높이 56) */
-export function MemoSwitch({ value, onChange, hint }: { value: boolean; onChange: (next: boolean) => void; hint: string }) {
+export function MemoSwitch({
+  value,
+  onChange,
+  hint,
+  label = T.memoSwitch,
+}: {
+  value: boolean;
+  onChange: (next: boolean) => void;
+  hint: string;
+  /** 스위치 이름(기본 '메모 포함'). 같은 모양으로 다른 옵션('물어볼 것 포함')에도 쓴다 */
+  label?: string;
+}) {
   return (
     <View style={{ gap: 4 }}>
       <Pressable
         accessibilityRole="switch"
-        accessibilityLabel={`${T.memoSwitch}, ${value ? '켜짐' : '꺼짐'}`}
+        accessibilityLabel={`${label}, ${value ? '켜짐' : '꺼짐'}`}
         accessibilityState={{ checked: value }}
         onPress={() => onChange(!value)}
         style={({ pressed }) => [
@@ -208,7 +219,7 @@ export function MemoSwitch({ value, onChange, hint }: { value: boolean; onChange
           pressed && { opacity: 0.6 },
         ]}
       >
-        <AppText style={{ fontWeight: '700' }}>{T.memoSwitch}</AppText>
+        <AppText style={{ fontWeight: '700', flexShrink: 1 }}>{label}</AppText>
         <AppText style={{ fontWeight: '700' }}>{value ? '✓ 켜짐' : '꺼짐'}</AppText>
       </Pressable>
       <AppText variant="caption">{hint}</AppText>

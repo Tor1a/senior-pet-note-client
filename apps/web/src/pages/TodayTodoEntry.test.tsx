@@ -71,9 +71,11 @@ describe('오늘 화면 — 내 할 일 일정 진입 카드', () => {
     const card = link.closest('section')!;
     expect(card.textContent).toContain(TODO_TEXT.entryTitle);
     expect(findTodoForbidden(card.textContent ?? '')).toBeNull();
-    // 카드 다음이 면책 문구이고, 계정 링크는 그 앞에 그대로 있다
+    // 카드 다음은 진료 때 물어볼 것 링크 행, 그 다음이 면책 문구이고, 계정 링크는 그 앞에 그대로 있다
     const disclaimer = screen.getByText(DISCLAIMER);
-    expect(card.nextElementSibling).toBe(disclaimer);
+    const questionLink = card.nextElementSibling as HTMLElement;
+    expect(questionLink.getAttribute('href')).toBe('/visit-questions');
+    expect(questionLink.nextElementSibling).toBe(disclaimer);
     expect(screen.getByRole('link', { name: /계정 · 로그아웃/ })).toBeTruthy();
   });
 

@@ -1,4 +1,4 @@
-// [공유 로직 사본] 원본: web/src/lib/reportText.ts (2026-10-08 복사)
+// [공유 로직 사본] 원본: web/src/lib/reportText.ts (2026-10-15 복사)
 // web/src/lib 과 동기화 필요. 추후 packages/shared 로 통합 예정 (mobile/README.md 참고).
 // 이 파일만 고치지 말고 웹 원본과 함께 수정하세요.
 // 병원 방문 리포트 문구와 문장 조립, 공유용 텍스트 (사실만 말한다: 값·날짜·횟수. 평가·권유·의료 표현 없음)
@@ -72,6 +72,13 @@ export const REPORT_TEXT = {
   memoSwitchHintApp: '끄면 공유 내용에 메모가 담기지 않아요.',
   memoNone: '이 기간에는 메모가 없어요.',
   memoExcluded: '메모는 담지 않았어요.',
+  questionsTitle: '물어보고 싶은 것 (적은 그대로)',
+  questionsNote: '보호자가 미리 적어 둔 내용이에요.',
+  questionsSwitch: '물어볼 것 포함',
+  questionsHintWeb: '켜면 물어봤다고 체크하지 않은 것만 종이에 나와요.',
+  questionsHintApp: '켜면 물어봤다고 체크하지 않은 것만 공유 내용에 담겨요.',
+  questionsFailed: '물어볼 것을 불러오지 못했어요.',
+  questionsExcluded: '물어볼 것은 담지 않았어요.',
   print: '인쇄하기',
   printHint: '종이로 뽑거나, 인쇄 창에서 "PDF로 저장"을 골라 파일로 저장할 수 있어요.',
   printHint2: '인쇄 창이 열리지 않으면 브라우저 메뉴에서 인쇄를 골라 주세요.',
@@ -134,6 +141,11 @@ export interface ReportInput {
   days: HistoryDay[];
   medications: MedicationsState;
   includeMemo: boolean;
+  /**
+   * '물어볼 것 포함'이 켜져 있을 때만 넘기는 미완료 항목 글(서버가 준 순서 그대로, 가공 없음).
+   * 없거나 비어 있으면 모델·공유 텍스트가 이 필드가 없을 때와 완전히 같다.
+   */
+  questions?: readonly string[];
   /** 나머지 건수 문구: 'app'(앱 화면, 기본) | 'paper'(종이에 찍히는 문서) */
   restWording?: 'app' | 'paper';
 }
@@ -182,6 +194,8 @@ export interface ReportModel {
   medication: { lines: string[]; empty: string | null };
   medicationList: { status: MedicationsState['status']; items: { name: string; times: string }[]; message: string | null };
   memos: { included: boolean; items: { dateLabel: string; memo: string }[]; rest: string | null; message: string | null };
+  /** 켜져 있고 항목이 있을 때만 있다(없으면 키 자체가 없다) */
+  questions?: { items: string[] };
   emptyDays: { title: string; dates: string } | null;
   disclaimer: string;
 }
@@ -335,6 +349,7 @@ export function buildReport(input: ReportInput): ReportModel {
     medication: { lines: medLines, empty: medEmpty },
     medicationList,
     memos,
+    ...(input.questions && input.questions.length > 0 ? { questions: { items: [...input.questions] } } : {}),
     emptyDays:
       gaps.length > 0
         ? { title: `${REPORT_TEXT.emptyDatesTitle} ${gaps.length}일`, dates: gaps.map(formatMonthDay).join(', ') }
@@ -354,10 +369,13 @@ export function weightValueList(days: HistoryDay[]): string {
 }
 
 /** 공유 확인 카드의 "담기는 내용" 목록 */
-export function shareContents(model: ReportModel, medicationCount: number): string[] {
+export function shareContents(model: ReportModel, medicationCount: number, questionsOpenCount = 0): string[] {
   const items = [model.petLine, `${model.periodLine} 체중`, '식사·물, 증상을 적은 날, 투약 체크'];
   if (model.medicationList.status === 'ready') items.push(`현재 등록된 약 ${medicationCount}개`);
   items.push(model.memos.included ? `메모 ${memoCount(model)}건` : REPORT_TEXT.memoExcluded);
+  // 물어볼 것: 켜짐이면 건수, 꺼짐이어도 미완료 항목이 있으면 담지 않았다고 알린다(0개·조회 실패면 줄 없음)
+  if (model.questions) items.push(`물어볼 것 ${model.questions.items.length}건`);
+  else if (questionsOpenCount > 0) items.push(REPORT_TEXT.questionsExcluded);
   return items;
 }
 
@@ -412,6 +430,12 @@ export function toPlainText(model: ReportModel, days: HistoryDay[]): string {
     if (model.memos.rest) out.push(restTextPaper(restCount(model.memos.rest)));
   } else {
     out.push('', REPORT_TEXT.memoExcluded);
+  }
+
+  // 켜져 있고 항목이 있을 때만. 꺼짐일 때 "담지 않았어요" 줄은 넣지 않는다(기존 출력과 동일)
+  if (model.questions) {
+    out.push('', `■ ${REPORT_TEXT.questionsTitle}`, REPORT_TEXT.questionsNote);
+    for (const text of model.questions.items) out.push(`☐ ${indentUserText(text)}`);
   }
 
   out.push('');

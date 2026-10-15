@@ -227,6 +227,8 @@ interface AppButtonProps {
   accessibilityHint?: string;
   /** 화면에 보이는 글자와 다르게 읽어 줄 문구(예: "−" 버튼의 "0.1kg 빼기") */
   accessibilityLabel?: string;
+  /** 보조 버튼도 높이 56(눌러야 할 일이 많은 줄 안 버튼) */
+  tall?: boolean;
 }
 
 export function AppButton({
@@ -237,6 +239,7 @@ export function AppButton({
   loading,
   accessibilityHint,
   accessibilityLabel,
+  tall,
 }: AppButtonProps) {
   const isPrimary = variant === 'primary';
   const inactive = disabled || loading;
@@ -252,6 +255,7 @@ export function AppButton({
       style={({ pressed }) => [
         styles.button,
         isPrimary ? styles.buttonPrimary : styles.buttonSecondary,
+        tall && styles.buttonTall,
         (pressed || inactive) && styles.buttonDimmed,
       ]}
     >
@@ -345,6 +349,7 @@ const styles = StyleSheet.create({
   },
   buttonPrimary: { minHeight: touch.primaryHeight, backgroundColor: colors.primary },
   buttonSecondary: { borderWidth: 2, borderColor: colors.border, backgroundColor: colors.surface },
+  buttonTall: { minHeight: touch.primaryHeight },
   buttonDimmed: { opacity: 0.6 },
   card: {
     gap: spacing.sm,

@@ -15,6 +15,7 @@ import {
   TODO_TEXT,
   undoLabel,
 } from '../lib/todoText';
+import { VISIT_QUESTION_TEXT } from '../lib/visitQuestionText';
 import { usePet } from '../pet';
 
 // 내 할 일 목록 (/todos, 알림을 눌러 열면 ?source=push) — 기획서 6-1
@@ -163,6 +164,10 @@ export default function TodosPage() {
       <main className="page">
         <h1>{TODO_TEXT.listTitle}</h1>
         <p className="lead">{TODO_TEXT.guide}</p>
+        <Link to="/visit-questions?from=todos" className="history-link-row">
+          <span>{VISIT_QUESTION_TEXT.title}</span>
+          <span aria-hidden="true">›</span>
+        </Link>
 
         {notice && (
           <div role="status" className="ok">

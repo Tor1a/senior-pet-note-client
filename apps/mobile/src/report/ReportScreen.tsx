@@ -23,6 +23,7 @@ import { DISCLAIMER } from '../lib/constants';
 import { formatTime } from '../lib/format';
 import { staleNotice } from '../lib/historyText';
 import type { HistoryResponse } from '../lib/petApi';
+import { questionTexts } from '../lib/visitQuestionForm';
 import { parseReportRange, REPORT_RANGES, reportDays, type ReportRange } from '../lib/reportStats';
 import {
   buildReport,
@@ -35,7 +36,7 @@ import {
 import { goBackOr } from '../medications/routes';
 import { ScreenTop } from '../medications/ScreenTop';
 import { usePet } from '../pet/PetProvider';
-import { petApi } from '../services/client';
+import { petApi, visitQuestionApi } from '../services/client';
 import { colors, spacing } from '../theme';
 import { MemoSwitch, ReportCards } from './ReportCards';
 
@@ -46,6 +47,8 @@ function nowText(): string {
   const d = new Date();
   return formatTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`);
 }
+
+type QuestionsState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; texts: string[] };
 
 export default function ReportScreen() {
   const router = useRouter();
@@ -62,6 +65,8 @@ export default function ReportScreen() {
   const [loading, setLoading] = useState(true);
   const [medications, setMedications] = useState<MedicationsState>({ status: 'loading' });
   const [includeMemo, setIncludeMemo] = useState(true);
+  const [questions, setQuestions] = useState<QuestionsState>({ status: 'loading' });
+  const [includeQuestions, setIncludeQuestions] = useState(false);
   const [rangeNotice, setRangeNotice] = useState('');
   const [tableOverride, setTableOverride] = useState<boolean | null>(null);
   const [screenReader, setScreenReader] = useState(false);
@@ -71,6 +76,7 @@ export default function ReportScreen() {
   const [shareMessage, setShareMessage] = useState<{ text: string; failed: boolean } | null>(null);
   const seq = useRef(0);
   const medSeq = useRef(0);
+  const questionSeq = useRef(0);
   const alive = useRef(true);
 
   useEffect(() => {
@@ -119,6 +125,19 @@ export default function ReportScreen() {
     }
   }, [petId]);
 
+  // 물어볼 것은 기록이 있는 리포트(recorded > 0)에서만, 반려동물당 미완료만 1번 받는다(기간을 바꿔도 다시 받지 않는다). 실패해도 리포트는 막지 않는다. 메모리에만 둔다
+  const loadQuestions = useCallback(async () => {
+    if (!petId) return;
+    const mine = ++questionSeq.current;
+    setQuestions({ status: 'loading' });
+    try {
+      const res = await visitQuestionApi.listVisitQuestions(petId, 'open');
+      if (alive.current && mine === questionSeq.current) setQuestions({ status: 'ready', texts: questionTexts(res) });
+    } catch {
+      if (alive.current && mine === questionSeq.current) setQuestions({ status: 'error' });
+    }
+  }, [petId]);
+
   useEffect(() => {
     void load();
     void loadMedications();
@@ -126,11 +145,36 @@ export default function ReportScreen() {
 
   const days = useMemo(() => (history ? reportDays(history.days, range) : []), [history, range]);
   const model = useMemo(
-    () => (pet && history ? buildReport({ pet, recordDate: history.recordDate, days, medications, includeMemo }) : null),
-    [pet, history, days, medications, includeMemo],
+    () =>
+      pet && history
+        ? buildReport({
+            pet,
+            recordDate: history.recordDate,
+            days,
+            medications,
+            includeMemo,
+            ...(includeQuestions && questions.status === 'ready' && questions.texts.length > 0
+              ? { questions: questions.texts }
+              : {}),
+          })
+        : null,
+    [pet, history, days, medications, includeMemo, includeQuestions, questions],
   );
   const recorded = model?.recorded ?? 0;
   const canShare = !!model && recorded > 0;
+
+  // 반려동물이 바뀌면 이전 물어볼 것을 비우고, 기록이 있다고 확인된 뒤에만 한 번 받는다(실패는 [다시 불러오기] 로만 재시도)
+  const questionsFor = useRef<string | null>(null);
+  useEffect(() => {
+    questionsFor.current = null;
+    questionSeq.current += 1;
+    setQuestions({ status: 'loading' });
+  }, [petId]);
+  useEffect(() => {
+    if (!petId || recorded <= 0 || questionsFor.current === petId) return;
+    questionsFor.current = petId;
+    void loadQuestions();
+  }, [petId, recorded, loadQuestions]);
   const tableOpen = tableOverride ?? (screenReader || fontScale >= HUGE_FONT_SCALE);
 
   // 시스템 뒤로 = 확인 카드 닫기(화면은 유지). 한 번 더 누르면 나간다
@@ -183,7 +227,17 @@ export default function ReportScreen() {
         ? T.printDisabledEmpty
         : null;
   const medicationCount = medications.status === 'ready' ? medications.items.filter((m) => m.active).length : 0;
+  const questionsOpenCount = questions.status === 'ready' ? questions.texts.length : 0;
   const webPreview = Platform.OS === 'web';
+  const questionsOption =
+    recorded > 0 && questions.status === 'ready' && questions.texts.length > 0 ? (
+      <MemoSwitch
+        label={T.questionsSwitch}
+        value={includeQuestions}
+        onChange={setIncludeQuestions}
+        hint={T.questionsHintApp}
+      />
+    ) : null;
 
   return (
     <Screen
@@ -243,7 +297,14 @@ export default function ReportScreen() {
             onRetryMedications={() => void loadMedications()}
           />
           {!confirmOpen && <MemoSwitch value={includeMemo} onChange={setIncludeMemo} hint={T.memoSwitchHintApp} />}
+          {!confirmOpen && questionsOption}
         </>
+      )}
+      {recorded > 0 && questions.status === 'error' && (
+        <NoticeCard kind="info" alert>
+          <AppText>{T.questionsFailed}</AppText>
+          <AppButton label={T.retry} variant="secondary" onPress={() => void loadQuestions()} />
+        </NoticeCard>
       )}
 
       {webPreview ? (
@@ -256,10 +317,11 @@ export default function ReportScreen() {
           <AppText>{T.shareConfirmBody}</AppText>
           <AppText>{T.shareConfirmBody2}</AppText>
           <AppText style={{ fontWeight: '700' }}>{T.shareContents}</AppText>
-          {shareContents(model, medicationCount).map((line) => (
+          {shareContents(model, medicationCount, questionsOpenCount).map((line) => (
             <AppText key={line}>{`· ${line}`}</AppText>
           ))}
           <MemoSwitch value={includeMemo} onChange={setIncludeMemo} hint={T.memoSwitchHintApp} />
+          {questionsOption}
           <AppButton
             label={previewOpen ? T.sharePreviewClose : T.sharePreview}
             variant="secondary"

@@ -155,6 +155,21 @@ export default function ReportSheet({
         {model.memos.rest && <p>{model.memos.rest}</p>}
       </section>
 
+      {model.questions && (
+        <section className="report-section report-questions" aria-labelledby={h('questions')}>
+          <h2 id={h('questions')}>{T.questionsTitle}</h2>
+          <p className="muted">{T.questionsNote}</p>
+          <ul className="report-list">
+            {model.questions.items.map((text, i) => (
+              <li key={`${i}-${text}`}>
+                <span aria-hidden="true">☐ </span>
+                <span className="report-user-text">{text}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {model.emptyDays && (
         <section className="report-section report-gaps" aria-labelledby={h('gaps')}>
           <h2 id={h('gaps')}>{model.emptyDays.title}</h2>

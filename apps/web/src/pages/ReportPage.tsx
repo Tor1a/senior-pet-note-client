@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent }
 import { Link, useSearchParams } from 'react-router-dom';
 import ReportSheet from '../components/ReportSheet';
 import { ApiError, isNetworkError, NETWORK_ERROR_MESSAGE } from '../lib/api';
-import { petApi } from '../lib/client';
+import { petApi, visitQuestionApi } from '../lib/client';
 import { DISCLAIMER } from '../lib/constants';
 import type { HistoryResponse } from '../lib/petApi';
+import { questionTexts } from '../lib/visitQuestionForm';
 import { parseReportRange, REPORT_RANGES, reportDays, type ReportRange } from '../lib/reportStats';
 import {
   buildReport,
@@ -16,9 +17,11 @@ import {
 import { usePet } from '../pet';
 
 // R1 병원 방문 리포트: 지난 기록과 같은 daily-logs 호출 1번 + 약 목록으로 만든다(신규 API 없음).
-// 7/14/30일 전환은 재요청 없이 받은 days 를 자른다. 기간·메모 옵션은 어디에도 저장하지 않는다(매번 14일, 메모 포함).
+// 7/14/30일 전환은 재요청 없이 받은 days 를 자른다. 기간·메모·물어볼 것 옵션은 어디에도 저장하지 않는다(매번 14일, 메모 포함, 물어볼 것 꺼짐).
 // 인쇄는 window.print() + styles.css 의 @media print. 앱은 파일을 만들거나 저장하지 않는다.
 // 근거: .company/plans/병원-방문-리포트.md, .company/design/병원-방문-리포트.md
+
+type QuestionsState = { status: 'loading' } | { status: 'error' } | { status: 'ready'; texts: string[] };
 
 export default function ReportPage() {
   const { pet, reload: reloadPet } = usePet();
@@ -32,9 +35,13 @@ export default function ReportPage() {
   const [loading, setLoading] = useState(true);
   const [medications, setMedications] = useState<MedicationsState>({ status: 'loading' });
   const [includeMemo, setIncludeMemo] = useState(true);
+  // 물어볼 것: 기본 꺼짐, 어디에도 저장하지 않는다. 요청이 실패해도 리포트 본문·인쇄는 막지 않는다
+  const [questions, setQuestions] = useState<QuestionsState>({ status: 'loading' });
+  const [includeQuestions, setIncludeQuestions] = useState(false);
   const [rangeNotice, setRangeNotice] = useState('');
   const seq = useRef(0);
   const medSeq = useRef(0);
+  const questionSeq = useRef(0);
 
   const load = useCallback(async () => {
     if (!petId) return;
@@ -69,6 +76,18 @@ export default function ReportPage() {
     }
   }, [petId]);
 
+  const loadQuestions = useCallback(async () => {
+    if (!petId) return;
+    const mine = ++questionSeq.current;
+    setQuestions({ status: 'loading' });
+    try {
+      const res = await visitQuestionApi.listVisitQuestions(petId, 'open');
+      if (mine === questionSeq.current) setQuestions({ status: 'ready', texts: questionTexts(res) });
+    } catch {
+      if (mine === questionSeq.current) setQuestions({ status: 'error' });
+    }
+  }, [petId]);
+
   useEffect(() => {
     void load();
     void loadMedications();
@@ -78,9 +97,19 @@ export default function ReportPage() {
   const model = useMemo(
     () =>
       pet && history
-        ? buildReport({ pet, recordDate: history.recordDate, days, medications, includeMemo, restWording: 'paper' })
+        ? buildReport({
+            pet,
+            recordDate: history.recordDate,
+            days,
+            medications,
+            includeMemo,
+            restWording: 'paper',
+            ...(includeQuestions && questions.status === 'ready' && questions.texts.length > 0
+              ? { questions: questions.texts }
+              : {}),
+          })
         : null,
-    [pet, history, days, medications, includeMemo],
+    [pet, history, days, medications, includeMemo, includeQuestions, questions],
   );
 
   // 인쇄 창의 "PDF로 저장" 기본 파일명이 되도록 문서 제목을 바꿔 둔다(화면을 떠나면 되돌린다)
@@ -119,6 +148,13 @@ export default function ReportPage() {
   };
 
   const recorded = model?.recorded ?? 0;
+  // 물어볼 것은 기록이 있는 리포트에서만 필요하다: 기록이 없는 기간이면 부르지 않고, 기록이 생기면 반려동물당 한 번만 부른다
+  const questionsRequestedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!petId || recorded === 0 || questionsRequestedFor.current === petId) return;
+    questionsRequestedFor.current = petId;
+    void loadQuestions();
+  }, [petId, recorded, loadQuestions]);
   const printReason = !history
     ? T.printDisabledLoading
     : medications.status === 'loading'
@@ -184,6 +220,29 @@ export default function ReportPage() {
               <span className="switch-state">{includeMemo ? '켜짐' : '꺼짐'}</span>
             </button>
             <p className="muted small">{T.memoSwitchHintWeb}</p>
+            {recorded > 0 && questions.status === 'ready' && questions.texts.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={includeQuestions}
+                  className={`switch-row${includeQuestions ? ' is-on' : ''}`}
+                  onClick={() => setIncludeQuestions((v) => !v)}
+                >
+                  <span>{T.questionsSwitch}</span>
+                  <span className="switch-state">{includeQuestions ? '켜짐' : '꺼짐'}</span>
+                </button>
+                <p className="muted small">{T.questionsHintWeb}</p>
+              </>
+            )}
+            {recorded > 0 && questions.status === 'error' && (
+              <div role="status">
+                <p className="muted">{T.questionsFailed}</p>
+                <button type="button" className="btn-secondary" onClick={() => void loadQuestions()}>
+                  {T.retry}
+                </button>
+              </div>
+            )}
           </div>
           <div className="report-frame">
             <div className="report-frame-body">

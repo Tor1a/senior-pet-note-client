@@ -27,6 +27,7 @@ import { goBackOr } from '../medications/routes';
 import { usePet } from '../pet/PetProvider';
 import { todoApi } from '../services/client';
 import { spacing } from '../theme';
+import { VisitQuestionsLink } from '../visitQuestions/VisitQuestionsLink';
 import { isTodoNoticeKind, NEW_TODO_HREF, TODO_NOTICE_TEXT, todoHref } from './routes';
 
 type Tab = TodoStatus;
@@ -205,6 +206,8 @@ export default function TodosScreen() {
         </AppText>
         <AppText variant="secondary">{TODO_TEXT.guide}</AppText>
       </View>
+
+      <VisitQuestionsLink from="todos" />
 
       {notice ? (
         <NoticeCard kind="ok">

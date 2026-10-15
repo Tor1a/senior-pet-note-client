@@ -19,6 +19,7 @@ import { REPORT_TEXT } from '../lib/reportText';
 import { hasRoutineValue, isRoutineDirty, routineFromLog, undoRoutineNote } from '../lib/routineForm';
 import { undoRoutineSentence } from '../lib/routineText';
 import { TODO_TEXT } from '../lib/todoText';
+import { VISIT_QUESTION_TEXT } from '../lib/visitQuestionText';
 import { daysBetween, formatKg, formatRecordDate, LEVEL_LABELS, withParticle } from '../lib/format';
 import type { DailyLog, TodayResponse } from '../lib/petApi';
 import {
@@ -1022,6 +1023,11 @@ export default function TodayPage() {
                   {TODO_TEXT.entryButton}
                 </GuardLink>
               </section>
+
+              <GuardLink guard={guardLeave} to="/visit-questions" className="history-link-row">
+                <span>{VISIT_QUESTION_TEXT.title}</span>
+                <span aria-hidden="true">›</span>
+              </GuardLink>
 
               <ChecklistEntryCard profileType={pet?.profileType}>
                 <GuardLink

@@ -6,6 +6,7 @@ import { loadChecklist, saveChecklist } from '../lib/checklistStorage';
 import { CHECKLIST_TEXT as T } from '../lib/checklistText';
 import { DISCLAIMER } from '../lib/constants';
 import { HISTORY_TEXT } from '../lib/historyText';
+import { VISIT_QUESTION_TEXT } from '../lib/visitQuestionText';
 import { usePet } from '../pet';
 
 // F 처음 키워요 체크리스트: 일반 목록 + 보호자가 직접 체크, 체크는 이 기기(localStorage)에만 저장한다. 서버 호출 없음.
@@ -96,6 +97,12 @@ export default function ChecklistPage() {
             );
           })}
         </ul>
+        {tab === 'ask' && (
+          <Link to="/visit-questions?from=checklist" className="history-link-row vq-checklist-link">
+            <span>{VISIT_QUESTION_TEXT.checklistTitle}</span>
+            <span aria-hidden="true">›</span>
+          </Link>
+        )}
       </div>
 
       <p className="disclaimer">{DISCLAIMER}</p>

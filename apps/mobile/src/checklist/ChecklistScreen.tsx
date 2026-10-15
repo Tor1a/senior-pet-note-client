@@ -15,6 +15,7 @@ import { isLargeFont } from '../medications/layout';
 import { ScreenTop } from '../medications/ScreenTop';
 import { usePet } from '../pet/PetProvider';
 import { loadChecklist, saveChecklist } from '../services/checklistStorage';
+import { VisitQuestionsLink } from '../visitQuestions/VisitQuestionsLink';
 import { colors, fontSize, spacing, touch } from '../theme';
 
 const TABS: { group: ChecklistGroup; label: string }[] = [
@@ -219,6 +220,8 @@ export default function ChecklistScreen() {
           />
         ))}
       </View>
+
+      {tab === 'ask' ? <VisitQuestionsLink from="checklist" variant="checklist" /> : null}
 
       <AppText variant="caption">{DISCLAIMER}</AppText>
     </Screen>

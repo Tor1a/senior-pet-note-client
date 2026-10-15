@@ -300,6 +300,9 @@ input[type='date'] { min-height: 3rem; font-size: 1.1rem; }
   /* 메모 구역·체중 구역은 통째로 밀지 않고 메모 한 건·표 한 행 단위로만 쪽을 나눈다 */
   .report-section.report-memo-section, .report-section.report-weight-section { break-inside: auto; }
   .report-memos .report-memo, .report-table tr { break-inside: avoid; }
+  /* 물어볼 것: 줄을 잇지 않고 한 항목 한 줄. 항목이 많으면 둘째 쪽으로 넘어가도 된다 */
+  .report-section.report-questions { break-inside: auto; }
+  .report-questions li { break-inside: avoid; }
   .report-table thead { display: table-header-group; }
   /* 한 장에 담으려고 짧은 줄은 한 줄로 잇는다(글자 크기는 그대로) */
   .report-head p.strong, .report-head p.strong + p { display: inline; margin-right: 4mm; }
@@ -444,3 +447,25 @@ fieldset { min-width: 0; }
 @container (max-width: 15rem) {
   .week-review-toggle { flex-direction: column; align-items: flex-start; }
 }
+
+/* ---------- 진료 때 물어볼 것 (/visit-questions): 설계 design/진료-질문-메모.md 4·8장. 새 색 없음, 빨강 없음 ---------- */
+.vq-page { word-break: keep-all; overflow-wrap: anywhere; }
+.vq-form { display: flex; flex-direction: column; gap: 0.5rem; margin: 0.75rem 0; }
+.vq-input { width: 100%; min-height: 3.5rem; font-size: 1.125rem; }
+.vq-help { margin: 0; font-size: 1rem; }
+.vq-count-line { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0.25rem 0.75rem; font-size: 1rem; }
+.vq-notice p { margin: 0.5rem 0 0; }
+.vq-tabs-wrap { container-type: inline-size; }
+.vq-list { margin-top: 0.5rem; }
+.vq-item { container-type: inline-size; }
+.vq-card { margin: 0; }
+.vq-text { font-size: 1.125rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.vq-collapsed .vq-text { flex: 1 1 100%; }
+.vq-card .btn-primary, .vq-card .btn-secondary, .vq-collapsed .btn-secondary { min-height: 3.5rem; width: 100%; border-radius: 8px; font-size: 1rem; font-weight: 700; }
+.vq-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.vq-form .btn-primary { min-height: 3.5rem; border-radius: 8px; }
+.vq-list { gap: 0.5rem; }
+.vq-checklist-link { margin-top: 1rem; }
+/* 컨테이너 폭 20rem 이하(글자 200% 확대)에서만 세로로 쌓는다. 100% 모양은 변하지 않는다 */
+@container (max-width: 20rem) { .vq-tabs { grid-template-columns: 1fr; } }
+@container (max-width: 20rem) { .vq-actions { grid-template-columns: 1fr; } }
